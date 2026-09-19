@@ -4,11 +4,13 @@
 
 ### When a coding agent passes the test without solving the task, AutoSeal investigates why.
 
-An ML and full-stack research platform for detecting evaluator reward hacking,
-preserving execution evidence, repairing vulnerable verifiers,
-and independently validating the repair.
+I am building AutoSeal as an ML and full-stack research platform. Its goal is to
+detect evaluator reward hacking, preserve execution evidence, repair vulnerable
+verifiers, and validate each repair through an independent audit.
 
-**Current status:** Early research prototype — execution foundation under development
+**Built so far:** A reproducible false-reward experiment and a typed process runner.
+
+**Working on next:** Timeouts and safe process termination.
 
 </div>
 
@@ -28,7 +30,35 @@ solution.
 
 ```text
 Incorrect candidate
-        │
-        ├── Vulnerable proxy ──► 7 skipped, exit 0 ──► PASS
-        │
-        └── Independent audit ─► 3 failed, exit 1 ──► REJECT
+        |
+        +--> Vulnerable proxy: 7 skipped, exit 0, PASS
+        |
+        +--> Independent audit: 3 failed, exit 1, REJECT
+```
+
+That disagreement is the problem AutoSeal is being built to investigate.
+
+## What the project is trying to answer
+
+AutoSeal starts with a simple question: how can we tell whether a coding agent
+actually solved a task or only found a weakness in the evaluator?
+
+The long-term system will compare a proxy evaluator with an independent audit.
+When their verdicts disagree, it will preserve the evidence, investigate the
+cause, propose a safer verifier, and test the repair against both exploits and
+legitimate solutions.
+
+This complete pipeline is not built yet. I am developing it one tested layer at
+a time, beginning with reproducible experiments and reliable process execution.
+
+## How I am building it
+
+Every project day has its own record under `research/`. Each record explains
+what I built, why I built it, how it works, what the tests prove, what they do
+not prove, and what I still need to improve.
+
+Reusable code lives in `src/`, automated tests live in `tests/`, and runnable
+examples live in `examples/`.
+
+I want the repository to show the complete engineering journey, including the
+mistakes, limitations, evidence, and decisions that shape the final system.
