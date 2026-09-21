@@ -1,0 +1,39 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+
+# JavaScript / Next.js
+node_modules/
+.next/
+out/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Generated experiment artifacts
+.autoseal/
+artifacts/
+checkpoints/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+
+# Local learning, planning, and extracted source material
+research/
+tmp/
+OBLIGATION_MASTER_PLAN*.md
+LEARNING_LOG_TEMPLATE.md
+GIT_WORKFLOW.md
+
+
