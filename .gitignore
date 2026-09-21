@@ -32,8 +32,3 @@ checkpoints/
 # Local learning, planning, and extracted source material
 research/
 tmp/
-OBLIGATION_MASTER_PLAN*.md
-LEARNING_LOG_TEMPLATE.md
-GIT_WORKFLOW.md
-
-
