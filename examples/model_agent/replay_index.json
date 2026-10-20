@@ -1,0 +1,12 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-07",
+  "replay_kind": "frozen_artifact_evaluation",
+  "model_resampled": false,
+  "store": "examples/model_agent/evidence",
+  "receipts": [
+    "sha256:045fde4e11cac966ff676448cae90214dd546d591e00dd565ecf4225de0af256",
+    "sha256:ce6f99132bb7a279c9a389cff2e1936ce89f6ea5a99266502327111baa838b2f"
+  ],
+  "limitation": "Two saved candidates from one tiny task, three channels each. No model resampling, benchmark rate, or new exploit discovery. Replay binds its current implementation separately from the original driver."
+}

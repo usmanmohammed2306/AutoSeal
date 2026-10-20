@@ -1,0 +1,24 @@
+{
+  "all_refs_commit_count": 1,
+  "fix_commit": "41dfec20bfe9b62cddbbbf621bef2e9aa9685157",
+  "focused_passed_tests": 10,
+  "focused_test": "test/utils/AutoDiscoveryUtils-test.tsx",
+  "known_original_git_database_removed": true,
+  "limitations": [
+    "The original reporter discovered the answer leak.",
+    "Only the named future fix and reachable Git refs were checked; no exhaustive filesystem scan was made.",
+    "Focused task-test preservation is not a full semantic audit.",
+    "No coding agent, native benchmark score, valid alternatives, or held-out variants were run.",
+    "This prototype has not passed AutoSeal's promotion firewall or rollback gates."
+  ],
+  "named_future_fix_absent": true,
+  "original_report": "https://github.com/scaleapi/SWE-bench_Pro-os/issues/93",
+  "schema_version": 1,
+  "scope": "one disclosed task; derived history-free image prototype",
+  "sealed_image": "autoseal/swebench-pro-history-sealed:task-d5d1ec7",
+  "sealed_image_identity": "sha256:439abce900c30be72d438d76a91202d7ffbd11683f3ef625de52da1d4951a708",
+  "source_image": "jefzda/sweap-images@sha256:aa7fe7a0d2517293b6d689572867a2da18dd702cb418ffa586f758608f491ac6",
+  "task_head": "d5d1ec775caf2d3c9132122c1243898e99fdb2da",
+  "task_tree": "17ec485712222c12d9d849069d58d27bad9278e3",
+  "working_tree_clean_before_test": true
+}

@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 *.egg-info/
 .pytest_cache/
+.hypothesis/
 .coverage
 htmlcov/
 build/
@@ -11,7 +12,9 @@ dist/
 
 # JavaScript / Next.js
 node_modules/
+.pnpm-store/
 .next/
+*.tsbuildinfo
 out/
 
 # Local configuration and secrets
@@ -30,5 +33,11 @@ checkpoints/
 .vscode/
 
 # Local learning, planning, and extracted source material
-research/
-tmp/
+/research/
+/tmp/
+/AGENTS.md
+
+# Machine-specific run archives remain local; source and summary reports ship.
+/examples/model_agent/evidence/
+/examples/upstream_swebench/native/evidence/
+/examples/training_pilot/*/objects/

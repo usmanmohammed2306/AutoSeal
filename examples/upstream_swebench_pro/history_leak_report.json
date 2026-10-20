@@ -1,0 +1,20 @@
+{
+  "fix_commit": "41dfec20bfe9b62cddbbbf621bef2e9aa9685157",
+  "fix_parent_is_task_head": true,
+  "fix_subject": "add delegatedauthentication to validated server config (#11053)",
+  "future_commits_reachable_from_origin_head": 17331,
+  "history_free_projection_excludes_fix": true,
+  "history_free_projection_tree_matches": true,
+  "image": "jefzda/sweap-images@sha256:aa7fe7a0d2517293b6d689572867a2da18dd702cb418ffa586f758608f491ac6",
+  "limitations": [
+    "The original reporter discovered the leak and proposed an upstream fix.",
+    "No model trajectory or native SWE-bench Pro score was evaluated here.",
+    "The projected Git tree was checked, but a full working-tree or test-suite parity run was not.",
+    "The projection is an ephemeral proof, not an issued AutoSeal repair."
+  ],
+  "original_report": "https://github.com/scaleapi/SWE-bench_Pro-os/issues/93",
+  "schema_version": 1,
+  "scope": "one disclosed SWE-bench Pro image; Git-history inspection only",
+  "task_head": "d5d1ec775caf2d3c9132122c1243898e99fdb2da",
+  "task_tree": "17ec485712222c12d9d849069d58d27bad9278e3"
+}

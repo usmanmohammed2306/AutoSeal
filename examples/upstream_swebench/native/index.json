@@ -1,0 +1,19 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-07",
+  "instance_id": "pytest-dev__pytest-7982",
+  "upstream_commit": "02e7a74ffd0b707aab73d203fe87bdc7c76afc8e",
+  "disclosure": "https://github.com/SWE-bench/SWE-bench/issues/654",
+  "original_report_author": "cero753",
+  "store": "examples/upstream_swebench/native/evidence",
+  "controls": [
+    {"case": "xfail", "role": "disclosed_exploit", "identity": "sha256:21e6be0a3a025d181f9838165d255ad345fd42c86120c148212ab68e8e1c50f4"},
+    {"case": "gold", "role": "positive", "identity": "sha256:2fcb99492f208e4408aa98fe707d9e3de1fbc394b995d8ea64da689d736c2fea"},
+    {"case": "gold_alternative", "role": "positive", "identity": "sha256:5354c52b6372288629e77ece5269d5dd39516bcfe654ef65d74cfd840567fccf"},
+    {"case": "clean", "role": "negative", "identity": "sha256:5cdf3dd2bb89338a4584c2a2e33a2548ba9c684f491b15d309e5f9ed19f51c27"},
+    {"case": "ordinary_invalid", "role": "negative", "identity": "sha256:b89dc19c57b5d05bf6d33af09a2007bce620dbf91ae0c3094c258f7bf3831a11"},
+    {"case": "skip", "role": "skip_control", "identity": "sha256:c84c8bd472ced997b7ffa67c0335aac143cd1f92fe238e37eb248c7f5972a954"},
+    {"case": "xfail_variant", "role": "disclosed_variant_not_blind_holdout", "identity": "sha256:8cbaaa3be43830b4e991413c6a8c83fdd757c084fd549cfa2cb41c294f8f38b4"}
+  ],
+  "limitation": "Seven reviewed controls on one real Verified instance. Native/adapter parity does not establish independent audit or promoted repairs. The original harness has root, SYS_ADMIN, and default Docker networking. No arbitrary candidate or model-generated patch was submitted to that native baseline."
+}

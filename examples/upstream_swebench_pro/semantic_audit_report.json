@@ -1,0 +1,56 @@
+{
+  "audit_recipe_sha256": "91807463b26b28a965d0bda5abe28e1b02f603678ecf928027f781dcb09b7ef3",
+  "audit_source_sha256": "1e530178b92b10025b6248b0c13bdb529395e733f6fe05cd280bf28ae3a99f26",
+  "audit_test": "test/utils/AutoSealDelegatedAuth-audit-test.tsx",
+  "candidate_facing_sealed_image": "autoseal/swebench-pro-history-sealed:task-d5d1ec7",
+  "limitations": [
+    "The original reporter discovered the answer leak and the gold patch is the public upstream fix.",
+    "The audit was separately authored after inspecting the public fix and is not blind or hidden from future agents.",
+    "This is focused Jest evaluation, not the native SWE-bench Pro grader.",
+    "Only one public positive and one unsolved baseline are compared in each environment.",
+    "No model agent, held-out re-attack, promotion firewall, or general security claim is established."
+  ],
+  "original_focused_test": "test/utils/AutoDiscoveryUtils-test.tsx",
+  "outcomes": {
+    "original_baseline": {
+      "audit_image": "autoseal/swebench-pro-audit:original-baseline",
+      "audit_image_identity": "sha256:4c279148eb99190819490dbc46fbb7d7e399c50a7e5f89c12b386479436e241f",
+      "audit_verdict": "REJECT",
+      "exit_code": 1,
+      "failed_tests": 1,
+      "passed_tests": 12,
+      "total_tests": 13
+    },
+    "original_gold": {
+      "audit_image": "autoseal/swebench-pro-audit:original-gold",
+      "audit_image_identity": "sha256:2f6dbcee40dc151ffc45f498bc83cb1b67573873815f8ddd6cb986bcaa1bcf6d",
+      "audit_verdict": "PASS",
+      "exit_code": 0,
+      "failed_tests": 0,
+      "passed_tests": 13,
+      "total_tests": 13
+    },
+    "sealed_baseline": {
+      "audit_image": "autoseal/swebench-pro-audit:sealed-baseline",
+      "audit_image_identity": "sha256:ce829c103e2a6dc21867133ad61a0fa3398e707e3e1c9e432b8a23777e7f40e6",
+      "audit_verdict": "REJECT",
+      "exit_code": 1,
+      "failed_tests": 1,
+      "passed_tests": 12,
+      "total_tests": 13
+    },
+    "sealed_gold": {
+      "audit_image": "autoseal/swebench-pro-audit:sealed-gold",
+      "audit_image_identity": "sha256:ff119401b15f57ce1bdb8bc0c9799ab4b5dd9b2c5d904adf98b4a1f6f5a180cd",
+      "audit_verdict": "PASS",
+      "exit_code": 0,
+      "failed_tests": 0,
+      "passed_tests": 13,
+      "total_tests": 13
+    }
+  },
+  "reviewed_gold_source_commit": "41dfec20bfe9b62cddbbbf621bef2e9aa9685157",
+  "schema_version": 1,
+  "scope": "one disclosed task; four-way focused semantic-audit control matrix",
+  "source_image": "jefzda/sweap-images@sha256:aa7fe7a0d2517293b6d689572867a2da18dd702cb418ffa586f758608f491ac6"
+}

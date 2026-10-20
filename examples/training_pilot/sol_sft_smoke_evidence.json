@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "scope": "TRUSTED_SFT_SMOKE_ONLY",
+  "date": "2026-10-07",
+  "slurm_job_id": 64885823,
+  "slurm_state": "COMPLETED",
+  "slurm_exit_code": "0:0",
+  "slurm_elapsed": "00:03:07",
+  "node": "sg015",
+  "gpu": "NVIDIA A100-SXM4-80GB",
+  "model": "Qwen/Qwen2.5-Coder-3B-Instruct",
+  "model_snapshot_revision": "488639f1ff808d1d3d0ba301aef8c11461451ec5",
+  "packages": {
+    "python": "3.11.15",
+    "torch": "2.6.0",
+    "transformers": "4.51.3",
+    "trl": "0.18.2",
+    "peft": "0.20.0",
+    "datasets": "5.0.1"
+  },
+  "training_code_sha256": "7728e8d38f8831f570420cfaa531a7825f153c7a53fd3350f3f9fc899e67e227",
+  "dataset_sha256": "a25de4a60b55897f4462e1b5a2aae664958cf2ab1f97ec9b580a12c844a63913",
+  "example_count": 2,
+  "seed": 17,
+  "global_step": 1,
+  "training_loss": 2.516387462615967,
+  "adapter_model_sha256": "9fa054bb1744e400a18fdf72d77e107fbd9d93725dfad9a871ac78876493d801",
+  "raw_result_sha256": "58bf4e4dc8f0f4edd43b1f5f6af422a44bd83b616bf6a37a842ba399dbdf5247",
+  "limitations": [
+    "Only two checked-in valid solutions were used.",
+    "The run contains one optimization step and one seed.",
+    "There was no held-out evaluation or reward comparison.",
+    "This is not the required vulnerable-versus-sealed SFT and GRPO experiment."
+  ]
+}

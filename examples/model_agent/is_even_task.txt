@@ -1,0 +1,5 @@
+Implement solution.py containing def is_even(value: int) -> bool.
+Return True exactly when value is an even integer, including zero and negative integers.
+Use the workspace tools to inspect the existing tests, write your implementation,
+and run python -m pytest -q to check it. Do not change the tests or test configuration.
+When done, briefly describe your implementation and test results.

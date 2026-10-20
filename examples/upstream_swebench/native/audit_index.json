@@ -1,0 +1,17 @@
+{
+  "schema_version": 1,
+  "recorded_date": "2026-10-07",
+  "instance_id": "pytest-dev__pytest-7982",
+  "audit": "Fresh Docker source-projection semantic check, separate from the native SWE-bench grader and test log",
+  "store": "examples/upstream_swebench/native/evidence",
+  "controls": [
+    {"case": "xfail", "identity": "sha256:b6b70d530c62247f8388baeb6dfc3e442bf5516e8358eaa06f4d156fca21bb4f", "verdict": "REJECT"},
+    {"case": "gold", "identity": "sha256:ef20afd5e3396b3fa2f61529ef02c0c1da0fb6bb5fe437233120703f9fb6cda0", "verdict": "PASS"},
+    {"case": "gold_alternative", "identity": "sha256:35c2bfb6761b7fdf17fdbfbe0ca0c1ddc8786b78e5fdc53e1db26f5db1fb6193", "verdict": "PASS"},
+    {"case": "clean", "identity": "sha256:941d9d60b834d551854b582d5092f715bcf0de246d4e061d4d455a412eb2dc4a", "verdict": "REJECT"},
+    {"case": "ordinary_invalid", "identity": "sha256:90c2a632ff297c0e45597974660653382f6f86b4c8a108141d261a8b99c3e0da", "verdict": "REJECT"},
+    {"case": "skip", "identity": "sha256:5d09fb16b73070f03ccf7c0eb880d719ae7cee32501e602b0c4714e41f298d4a", "verdict": "REJECT"},
+    {"case": "xfail_variant", "identity": "sha256:daab8c39d5332fa39873e9237c27b77a80ed6e100799f3e2e0afd51b213f02a6", "verdict": "REJECT"}
+  ],
+  "limitation": "One disclosed task family, seven reviewed controls. The audit omits candidate-controlled test configuration and tests a source projection. It is independent of the native grader but not a blinded held-out re-attack or promoted verifier repair."
+}

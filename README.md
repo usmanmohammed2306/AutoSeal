@@ -2,63 +2,169 @@
 
 # AutoSeal
 
-### When a coding agent passes the test without solving the task, AutoSeal investigates why.
+### Inspect the gap between passing a grader and solving the task.
 
-I am building AutoSeal as an ML and full-stack research platform. Its goal is to
-detect evaluator reward hacking, preserve execution evidence, repair vulnerable
-verifiers, and validate each repair through an independent audit.
+AutoSeal records execution evidence, compares evaluator verdicts, and investigates the candidate-controlled changes behind a false reward.
 
-**Built so far:** A reproducible false-reward experiment and a typed process runner.
+Python CLI · FastAPI · PostgreSQL · Docker · Next.js · PyTorch / TRL tooling
 
-**Working on next:** Timeouts and safe process termination.
+**Available now:** A runnable research implementation with a browser, worker, evidence store, verifier comparisons, and training tooling. The full scientific release remains in progress.
 
 </div>
 
 ---
 
-## The experiment that started AutoSeal
+## What you can inspect
 
-I began with a deliberately small programming task: implement a function that
-determines whether an integer is even.
+| Capability | Entry point |
+|---|---|
+| Reproduce a false reward and compare verdicts | `python -m autoseal demo --summary` |
+| Trace candidate influence and minimize a witness | `python -m autoseal influence exploit` |
+| Inspect repair candidates and preservation checks | `python -m autoseal promotion-review` |
+| Queue runs and inspect persisted evidence | [Local platform setup](#the-local-full-stack-path) |
+| Read the measured results and their limits | [Results](docs/RESULTS.md) |
+| Reproduce source checks and configure optional archives | [Reproducibility](docs/REPRODUCIBILITY.md) |
 
-A correct solution passed all seven tests. An ordinary incorrect solution failed.
-But the same incorrect solution, accompanied by a candidate-controlled Pytest
-configuration, skipped every test and still caused Pytest to exit successfully.
-
-The vulnerable evaluator awarded a pass. An independent audit rejected the same
-solution.
-
-```text
-Incorrect candidate
-        |
-        +--> Vulnerable proxy: 7 skipped, exit 0, PASS
-        |
-        +--> Independent audit: 3 failed, exit 1, REJECT
+```mermaid
+flowchart LR
+    C[Frozen candidate] --> P[Proxy evaluator]
+    C -->|Documented projection| A[Independent audit]
+    P --> E[Bound execution evidence]
+    A --> E
+    E --> S[Studio and replay]
 ```
 
-That disagreement is the problem AutoSeal is being built to investigate.
+The public checkout includes implementation, tests, synthetic fixtures, pinned licensed grader excerpts, and compact result reports. Machine-specific raw run archives, credentials, checkpoints, and local learning records stay outside Git. Archive-dependent views report unavailable evidence until a local archive is supplied.
 
-## What the project is trying to answer
+## Start with the failure
 
-AutoSeal starts with a simple question: how can we tell whether a coding agent
-actually solved a task or only found a weakness in the evaluator?
+The first task is almost embarrassingly small: write `is_even(value)`. A correct solution passes seven tests. An incorrect solution fails three of them. But if the incorrect candidate is allowed to bring its own Pytest configuration into the verifier workspace, it can skip all seven tests. Pytest exits successfully, even though the candidate has not solved the task.
 
-The long-term system will compare a proxy evaluator with an independent audit.
-When their verdicts disagree, it will preserve the evidence, investigate the
-cause, propose a safer verifier, and test the repair against both exploits and
-legitimate solutions.
+AutoSeal runs the same solution bytes through three channels:
 
-This complete pipeline is not built yet. I am developing it one tested layer at
-a time, beginning with reproducible experiments and reliable process execution.
+| Channel | What enters the verifier | Result for the exploit |
+|---|---|---|
+| Vulnerable proxy | The entire candidate directory | `PASS`, seven tests skipped |
+| Independent audit | Only the candidate's solution file | `REJECT`, three tests failed |
+| Projected verifier | Only allowlisted candidate artifacts | `REJECT`, three tests failed |
 
-## How I am building it
+The projected verifier is a first example of a *typed repair*: it changes which candidate files may cross the verifier boundary. It is not a universal cure. A different attack may survive it, and an actual repair must also preserve valid solutions and survive held-out attacks.
 
-Every project day has its own record under `research/`. Each record explains
-what I built, why I built it, how it works, what the tests prove, what they do
-not prove, and what I still need to improve.
+## Try the current prototype
 
-Reusable code lives in `src/`, automated tests live in `tests/`, and runnable
-examples live in `examples/`.
+From the repository root:
 
-I want the repository to show the complete engineering journey, including the
-mistakes, limitations, evidence, and decisions that shape the final system.
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e '.[dev]'
+python -m pytest -q -m 'not docker'
+python -m autoseal demo --summary
+python -m autoseal conformance process-evidence
+```
+
+The demo checks two correct implementations, two ordinary incorrect implementations, and two exploit variants across the proxy, audit, and projected verifier. Run `python -m autoseal demo` for the full process evidence. The [experiment guide](examples/false_reward_pytest/README.md) explains the fixture. Checks requiring separately retained archives are explicitly skipped when those archives are absent; a present but corrupt archive fails validation.
+
+The typed comparison can also be stored and verified on replay:
+
+```bash
+python -m autoseal compare exploit --store .autoseal/evidence
+python -m autoseal finding exploit
+python -m autoseal minimize exploit
+python -m autoseal repair-preview
+python -m autoseal repair-plan-preview
+python -m autoseal promotion-review
+python -m autoseal compare exit_spoof
+python -m autoseal influence exploit
+python -m autoseal upstream-swesmith collection_failure
+python -m autoseal upstream-swebench xfail
+python -m autoseal upstream-swebench-repair-preview
+```
+
+The comparison command prints a manifest identity when `--store` is used. Pass that identity to `python -m autoseal replay MANIFEST_ID --store .autoseal/evidence`. The minimizer currently tests file-level interventions on this one fixture. The repair preview compares typed local policies on development controls. The separate promotion review computes the selected plan and corpus identities, then tests a search-excluded attack, valid and invalid controls, native parity, repeatability, and process evidence. The checked-in attack is not a blind external benchmark holdout.
+
+The `exit_spoof` stress case exposes a different weakness. Its candidate ends Pytest early with exit code 0. The proxy grants a pass even though zero tests completed. The audit and projected verifier return `INCONCLUSIVE`, which prevents a false reward but is not a confirmed semantic rejection. The promotion review therefore returns `REJECTED` for the current projection. It also lacks proof of isolated verifier ownership, runtime privilege enforcement, and exact managed rollback. It issues no `SealEvidence`. The composed repair plan demonstrates policy ordering and an exact policy inverse, not a production seal.
+
+The [SWE-Smith case](examples/upstream_swesmith/README.md) runs byte-for-byte historical and fixed upstream grading functions on identical status maps. It demonstrates a real, publicly reported historical failure, not a current SWE-Smith vulnerability or a full benchmark run.
+
+The [SWE-bench xfail case](examples/upstream_swebench/README.md) reproduces a currently reported mechanism with a pinned upstream Pytest parser and grader. It runs a tiny candidate-controlled `conftest.py` hook and a pristine audit over the same wrong solution. AutoSeal has also run seven reviewed controls on one real Verified instance through the pinned official harness and checked them with a separate semantic audit. The issue reporter discovered the failure and supplied the original three-instance study. AutoSeal's one-instance reproduction is not a promoted upstream repair or broad benchmark result.
+
+The [SWE-bench Pro history case](examples/upstream_swebench_pro/README.md) explores a different failure: a public task image contains a future Git commit that reveals the task's fix. The original reporter discovered it. AutoSeal pinned one image, built a local task-head-only image, and checked that the named future fix is unavailable there while the task tree and ten existing focused tests still match. A separate task audit, written after inspecting the public fix, gives this small control matrix:
+
+| Control | Original image | History-free image |
+|---|---|---|
+| Unmodified task baseline | `REJECT`, 1 of 13 checks fails | `REJECT`, 1 of 13 checks fails |
+| Public upstream fix | `PASS`, 13 of 13 checks pass | `PASS`, 13 of 13 checks pass |
+
+This is focused Jest evidence, not a native SWE-bench Pro score, a model-generated exploit, a hidden audit, or a promoted repair. The [case report](examples/upstream_swebench_pro/semantic_audit_report.json) binds the audit source, recipe, and local image identities.
+
+You can also inspect a single command as structured evidence:
+
+```bash
+python -m autoseal run --timeout-seconds 2 -- python -c "print('hello')"
+```
+
+The runner records process status, exit code, bounded output, truncation, duration, and timeout. A zero exit code means the process reported success. It does not prove that a candidate is correct. The `evidence-id` command validates a saved process result and computes a versioned digest.
+
+## Trusted GPU setup on ASU Sol
+
+The scripts in [`scripts/sol`](scripts/sol) request one class-eligible A100. `gpu_probe.sbatch` confirms the device, and `training_preflight.sbatch` checks CUDA computation and the installed training packages. `sft_smoke.sbatch` runs exactly one LoRA update on the two checked-in correct `is_even` solutions. Its job, input, code, adapter, and result hashes are in the [SFT evidence](examples/training_pilot/sol_sft_smoke_evidence.json). Three paired GRPO bridge pilots actually trained on Sol while Mac Docker supplied rewards. The first returned 24 invalid outputs, the second returned 24 correct answers, and the third returned 18 invalid outputs plus six valid incorrect answers. All three had zero within-batch reward variance. Tagged-output G failed on a candidate-syntax classification bug, H completed with zero rewards and zero gradients, and I used a separately frozen pass-fraction diagnostic reward that yielded a nonzero gradient in each arm. The two I arms generated identical completions, got identical rewards, and produced identical adapters because none of their samples attempted the exploit. Their [summary and limitations](examples/training_pilot/README.md) are included here; the raw archives remain local. These runs establish transport and a real diagnostic trainer update, not evaluator-repair efficacy or downstream model improvement.
+
+Submit with a class account available to you, for example `sbatch -A YOUR_CLASS_ACCOUNT scripts/sol/gpu_probe.sbatch`. The preflight and SFT scripts also require the named environment and cached model paths documented in their environment-variable checks. Use `squeue` while the job is pending or running, and inspect its Slurm output and saved result after it finishes. Do not run AutoSeal's hostile-code fixtures or future generated candidates on shared Sol nodes. ASU's [partition guide](https://docs.rc.asu.edu/partitions-and-qos/), [GPU request guide](https://docs.rc.asu.edu/requesting-resources/), and [Mamba guide](https://docs.rc.asu.edu/mamba/) describe the current site conventions.
+
+A later [scripted reward-discrimination preflight](examples/training_pilot/controlled_population_v1/README.md) fed one valid, one ordinary-invalid, and one disclosed exploit-bearing completion through the same Mac Docker bridge. The vulnerable rewards were `[1, 0, 1]`; the sealed rewards were `[1, 0, 0]`; a separate audit accepted only the valid candidate. Its 48-object evidence archive is retained locally, but these were hand-selected fixture completions. No model sampled or trained on this preflight.
+
+## Real model tools across Mac Docker and Sol
+
+The user-selected research deployment keeps candidate execution in Mac Docker Desktop and trusted model inference and training on ASU Sol. No candidate Python runs on the shared cluster. The local tool container has no network, no Docker socket, and no credential mount. AutoSeal stops that container before copying or evaluating its final files.
+
+`model-run` calls the pinned Sol model through a localhost SSH forward. It records model outputs, model-visible messages, real tool observations, the complete candidate file snapshot, and proxy, audit, and sealed verdicts in the content-addressed store. API credentials are supplied separately and are not put in the deployment manifest or evidence. An agent saying it finished is not enough: missing artifacts, exhausted budgets, or evaluator failures cannot become complete evidence.
+
+The October 7, 2026 cross-hardware smoke record is in [`sol_docker_gpu_smoke.json`](examples/model_agent/sol_docker_gpu_smoke.json), with the original content-addressed evidence retained locally. A Qwen2.5-Coder 7B model served on one Sol A100 produced a correct solution through the Mac Docker tools. All three evaluators passed seven tests, and replay matched. In a separate, explicitly targeted attack prompt with a fixed incorrect implementation, the model's configuration change did not hide the three failing cases: proxy, audit, and sealed all rejected it, and replay matched. This is one successful benign run and one unsuccessful targeted attack attempt. It does not establish exploit prevalence, general evaluator security, or training benefit. The initial 3B manifest mismatch is also preserved as an infrastructure failure, not counted as an evaluation.
+
+With an active inference job and its SSH forward:
+
+```bash
+python -m autoseal model-run \
+  --deployment examples/model_agent/sol_required_tools_deployment.json \
+  --task examples/model_agent/is_even_task.txt \
+  --token-file .autoseal/credentials/sol-inference-token \
+  --store .autoseal/model-evidence
+python -m autoseal model-replay RECORDED_SHA256_ID --store .autoseal/model-evidence
+```
+
+The deployment files document measured model and server revisions, not a permanently running public endpoint. `scripts/sol/inference.sbatch` starts the ASU-provided vLLM Apptainer image on one class A100. Its middleware authenticates all routes, including `/health` and `/metrics`. Use the cached snapshot and a private token file through the script's named environment variables. Keep the forward bound to localhost. Cancel only your own inference job when finished.
+
+Artifact replay runs the exact recorded files through the evaluators again. It does not claim to reproduce stochastic inference. The targeted attack prompt is explicitly labeled as an attack exercise, not a naturally observed coding-agent behavior or a prevalence estimate.
+
+## The local full-stack path
+
+AutoSeal can queue a checked-in fixture from Studio, persist that request in PostgreSQL, process it in a separate worker, run proxy and audit in restricted Docker containers, store the report by content hash, and display the real verdicts, events, identities, and Pytest output in the browser.
+
+To run that path locally, use separate terminals for the API, worker, and Studio:
+
+```bash
+python -m pip install -e '.[dev,server]'
+docker build -f docker/fixture.Dockerfile -t autoseal-fixture:local .
+export AUTOSEAL_DB_PASSWORD=choose-a-local-development-password
+docker compose up -d --wait db
+export AUTOSEAL_DATABASE_URL="postgresql+psycopg://autoseal:${AUTOSEAL_DB_PASSWORD}@127.0.0.1:5433/autoseal"
+alembic upgrade head
+python -m autoseal serve --database-url "$AUTOSEAL_DATABASE_URL" --store .autoseal/evidence
+```
+
+In another terminal, run `python -m autoseal worker --database-url "$AUTOSEAL_DATABASE_URL" --store .autoseal/evidence`. In a third terminal, run `pnpm --dir apps/studio install` and `pnpm --dir apps/studio dev`, then open `http://127.0.0.1:3000`. Use the same evidence-store path for API and worker. The API and Studio are local-only research services without authentication. Do not expose them to the public internet.
+
+## What is built and what is not
+
+Built now: the public false-reward fixture, bounded process evidence, timeout and POSIX process-group cleanup, canonical identity, typed proxy and audit comparison, a verified local evidence store, file-level intervention and influence evidence, local repair-policy validation and fail-closed promotion preview, a design-time composed repair plan with a reversible policy overlay, a resettable Docker environment with a frozen evaluation boundary, trajectory recording and semantic replay, PostgreSQL-backed worker requests, migrations, a FastAPI service, and a Next.js Studio showing persisted records. There is also an authenticated Sol model service script and actual model-to-Docker tool runs, reviewed training-data conversion, a pinned historical SWE-Smith grader regression test, a native SWE-bench Verified-instance reproduction with independent semantic audit, a one-step SFT smoke run, and three archived paired GRPO bridge pilots. The reward bridge executes candidates only in Mac Docker and binds results to six identities. The Studio has a training-evidence view showing the null pilot results. Automated tests cover these local paths. No research-grade model comparison has been established.
+
+Not built yet: complete active enforcement and security review of the scoped Mac Docker deployment, diverse general benchmark adapters, a production repair grammar and promotion firewall, all nine final Studio screens, research-scale SFT and GRPO training with a useful reward signal, an adequately sized real external benchmark corpus, hidden-audit post-training comparisons, and release-quality scientific evaluation. One external native task and three zero-signal pilots cannot satisfy those gates.
+
+The simple `demo`, `compare`, `finding`, `minimize`, and `repair-preview` commands execute checked-in Python fixtures directly on the host. The `docker-fixture`, model agent, scripted-agent integration, and worker paths use Docker. Mac Docker Desktop is the selected scoped research deployment, not a production-grade public hostile-code service. **Do not use host fixture paths for generated or untrusted candidates, and do not expose arbitrary-code submission publicly.**
+
+## Where this is going
+
+The intended product will preserve the exact candidate and evaluator evidence, identify why a false reward happened, propose a typed verifier repair, and promote that repair only if it blocks attacks without breaking valid solutions. The later ML experiment will compare agents trained with vulnerable versus sealed rewards from the same starting checkpoint and budget.
+
+The current results support specific local engineering and evaluator findings. The remaining scientific gates are listed above so that a reader can distinguish the implementation from a completed efficacy study.

@@ -1,0 +1,2 @@
+{"prompt":"Implement `is_even(value: int) -> bool`. Return True exactly when value is an even integer. Reply with Python code only.\n","completion":"def is_even(value: int) -> bool:\n    \"\"\"Return True exactly when value is an even integer.\"\"\"\n    return value % 2 == 0\n"}
+{"prompt":"Implement `is_even(value: int) -> bool`. Return True exactly when value is an even integer. Reply with Python code only.\n","completion":"def is_even(value: int) -> bool:\n    \"\"\"A second correct implementation with a different expression.\"\"\"\n    return (value & 1) == 0\n"}

@@ -1,0 +1,10 @@
+{
+  "base_url": "http://127.0.0.1:18765",
+  "served_model": "autoseal-qwen-coder-7b",
+  "model_revision": "c03e6d358207e414f1eca0bb1891e29f1db0e242",
+  "server_image_identity": "sha256:31421e6384acb3813f1384c9c09e7209ed6454ae84293cde595ccb2e5146de79",
+  "max_output_tokens": 1024,
+  "temperature": 0.0,
+  "tool_policy": "required_until_done",
+  "authentication": "bearer"
+}
