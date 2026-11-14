@@ -1,0 +1,152 @@
+{
+  "analysis_id": "sha256:767331d542aea67b7c6337dd85586fc942daa9d9bf593bf6360cb387537c4212",
+  "analysis_source_id": "sha256:786b19453316472fc16c454dc73e7478b26879723d7112c453626a252d156106",
+  "case_validations": [
+    {
+      "task_id": "artifact-skip_hook-0",
+      "validation_id": "sha256:ceff6d373b450c882780de3608c118ffd0e216c3b05d342fca6f4b170641fa28"
+    },
+    {
+      "task_id": "artifact-skip_hook-1",
+      "validation_id": "sha256:dda78ee5189b49c4c7846fa02b645fd2b96685afbcf4aa3bed05934ee2cbf958"
+    },
+    {
+      "task_id": "artifact-test_override-0",
+      "validation_id": "sha256:8e1a3a7301ad9b742015366e89efee4a12755ca2dfc6bdf7d858bdfc85a4d221"
+    },
+    {
+      "task_id": "artifact-test_override-1",
+      "validation_id": "sha256:afb157fa21a6b385360aca93925d1d6ca15adbb2ee98ea7e44af292a0fe53d38"
+    },
+    {
+      "task_id": "artifact-reward_file-0",
+      "validation_id": "sha256:9d976f20a859614e0e4f396069de3a478b3a21d5666b1815b1ac094decde741b"
+    },
+    {
+      "task_id": "artifact-reward_file-1",
+      "validation_id": "sha256:d761bb60e507f8e3c432576b32067c5ca786a9827d3c6d6984f892fd5129d342"
+    },
+    {
+      "task_id": "artifact-cache_alias-0",
+      "validation_id": "sha256:c8654dd2b791de755944f8a2fccca457630a9fdcfe033a37209faaf4963c6567"
+    },
+    {
+      "task_id": "artifact-cache_alias-1",
+      "validation_id": "sha256:f02996024bb533bf7d5b66f1a6bb5c2166694552b61ddfffca6bafe462c55b5c"
+    }
+  ],
+  "corpus_id": "sha256:5a2330e3c468d957a177c18bf860357231a18525709ae864a29fa6ae64378a71",
+  "counts": {
+    "exact_witness_denylist": {
+      "attack_controls": 16,
+      "attack_false_rewards": 8,
+      "attempts": 48,
+      "audit_pass_controls": 16,
+      "audit_reject_controls": 32,
+      "false_rewards": 8,
+      "inconclusive": 0,
+      "ordinary_negative_rejections": 16,
+      "ordinary_negatives": 16,
+      "positive_passes": 16,
+      "positives": 16,
+      "rejected_valid_controls": 0
+    },
+    "fixed_answer_projection": {
+      "attack_controls": 16,
+      "attack_false_rewards": 0,
+      "attempts": 48,
+      "audit_pass_controls": 16,
+      "audit_reject_controls": 32,
+      "false_rewards": 0,
+      "inconclusive": 0,
+      "ordinary_negative_rejections": 16,
+      "ordinary_negatives": 16,
+      "positive_passes": 16,
+      "positives": 16,
+      "rejected_valid_controls": 0
+    },
+    "full_autoseal": {
+      "attack_controls": 16,
+      "attack_false_rewards": 0,
+      "attempts": 48,
+      "audit_pass_controls": 16,
+      "audit_reject_controls": 32,
+      "false_rewards": 0,
+      "inconclusive": 0,
+      "ordinary_negative_rejections": 16,
+      "ordinary_negatives": 16,
+      "positive_passes": 16,
+      "positives": 16,
+      "rejected_valid_controls": 0
+    },
+    "original_proxy": {
+      "attack_controls": 16,
+      "attack_false_rewards": 16,
+      "attempts": 48,
+      "audit_pass_controls": 16,
+      "audit_reject_controls": 32,
+      "false_rewards": 16,
+      "inconclusive": 0,
+      "ordinary_negative_rejections": 16,
+      "ordinary_negatives": 16,
+      "positive_passes": 16,
+      "positives": 16,
+      "rejected_valid_controls": 0
+    },
+    "search_with_one_positive": {
+      "attack_controls": 16,
+      "attack_false_rewards": 0,
+      "attempts": 48,
+      "audit_pass_controls": 16,
+      "audit_reject_controls": 32,
+      "false_rewards": 0,
+      "inconclusive": 0,
+      "ordinary_negative_rejections": 16,
+      "ordinary_negatives": 16,
+      "positive_passes": 16,
+      "positives": 16,
+      "rejected_valid_controls": 0
+    },
+    "search_without_preservation": {
+      "attack_controls": 16,
+      "attack_false_rewards": 0,
+      "attempts": 48,
+      "audit_pass_controls": 16,
+      "audit_reject_controls": 32,
+      "false_rewards": 0,
+      "inconclusive": 0,
+      "ordinary_negative_rejections": 16,
+      "ordinary_negatives": 16,
+      "positive_passes": 0,
+      "positives": 16,
+      "rejected_valid_controls": 16
+    }
+  },
+  "development_controls_per_method": 48,
+  "distinct_authored_tasks": 8,
+  "kind": "artifact_development_baseline_public_summary",
+  "limitations": [
+    "This compact summary does not replace the separately retained raw receipt stores.",
+    "Same six development controls per authored task. Search-excluded attack variants are not included.",
+    "Exact-file denylist decisions are an offline policy counterfactual. Other verdicts come from the authored adapter's previously saved development executions.",
+    "Fixed strict hardening and the one-positive selector tie the full method on this population; no incremental advantage or necessity of multiple positives is demonstrated.",
+    "Not external benchmark coverage, blind attacks, trained-agent improvement or the final baseline/ablation release gate."
+  ],
+  "new_candidate_executions": 0,
+  "new_model_calls": 0,
+  "protocol_id": "sha256:c11738401936cbdb48f962092511b57b09632b1dc4df0ab919721bb6d1a34722",
+  "schema_version": 1,
+  "status": "RETROSPECTIVE_DEVELOPMENT_ONLY",
+  "unavailable_comparators": [
+    {
+      "method": "released_separation_baseline",
+      "reason": "No matched replay of a released separation implementation is supplied by this archive. No favorable approximation is substituted.",
+      "status": "UNAVAILABLE"
+    },
+    {
+      "method": "released_hacker_fixer_patch",
+      "reason": "These authored cases have no matched released patch receipt. Native compatibility still needs its own checked comparison.",
+      "status": "UNAVAILABLE"
+    }
+  ]
+}

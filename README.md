@@ -21,6 +21,7 @@ Python CLI · FastAPI · PostgreSQL · Docker · Next.js · PyTorch / TRL toolin
 | Reproduce a false reward and compare verdicts | `python -m autoseal demo --summary` |
 | Trace candidate influence and minimize a witness | `python -m autoseal influence exploit` |
 | Inspect repair candidates and preservation checks | `python -m autoseal promotion-review` |
+| Compare matched development repair policies and their limits | [Repair baselines](docs/REPAIR_BASELINES.md) |
 | Validate, admit, replay and roll back a seeded artifact repair | [Repair workflows](docs/REPAIR_WORKFLOWS.md) |
 | Validate owned execution, retained receipts and managed rollback | [Managed validation](docs/MANAGED_VALIDATION.md) |
 | Queue runs and inspect persisted evidence | [Local platform setup](#the-local-full-stack-path) |

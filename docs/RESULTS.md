@@ -38,6 +38,10 @@ A later one-seed diagnostic pair produced nonconstant rewards and a nonzero grad
 
 ## Scope of the implementation
 
+### Matched development repair policies
+
+A retrospective comparison rechecked the same six development controls on each of eight authored fixed-output tasks. The original proxy falsely rewarded 16/16 attack controls; an exact minimized-file witness denylist retained 8/16 false rewards. The fixed strict policy and full AutoSeal each retained zero and accepted all 16 legitimate artifacts. The frozen selector ignoring preservation chose an output-dropping plan that rejected all 16 legitimate artifacts. Ordinary-invalid rejections remained 16/16 throughout. This is offline policy selection and receipt replay, not new candidate execution or independent benchmark sampling. The fixed policy and one-positive selector tied the full method, so no incremental search or multi-positive advantage is demonstrated here. [Definitions, denominators, compact report and remaining gates](REPAIR_BASELINES.md).
+
 ### November 13 repair and workflow results
 
 The fixed-output adapter validated and admitted **eight deliberately authored seeded cases** across four proxy mechanisms and four finite output operations. Each case freezes two valid controls, two ordinary-invalid controls, an exploit, a development variant and two search-excluded variants. Three typed plans are tested on development controls. An exploit-blocking plan that drops the required output is rejected; the selected plan must pass every preservation, repeatability, capability and rollback gate before activation with `SealEvidence`.
