@@ -44,7 +44,7 @@ class AccessPolicy:
             # is readable; launching an experiment requires the operator.
             path = scope["path"]
             saved = (path.startswith("/api/runs") or path.startswith("/api/workflows")
-                     or path in {"/api/cases", "/api/access", "/api/research/managed-repair", "/api/research/terminal-shell", "/api/research/sft-calibration"}
+                     or path in {"/api/cases", "/api/access", "/api/research/managed-repair", "/api/research/terminal-shell", "/api/research/sft-calibration", "/api/research/model-study"}
                      or path.startswith("/api/research/native-swebench")
                      or path.startswith("/api/research/training-pilots"))
             if not operator and (scope["method"] not in {"GET", "HEAD"} or not saved):

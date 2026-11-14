@@ -9,6 +9,7 @@ import json
 from pathlib import Path
 
 from autoseal.artifact_audit import evaluate_hidden_sample, summarize_hidden, verify_audit_generation, verify_hidden_evaluation
+from autoseal.artifact_study_review import require_analysis_source
 from autoseal.docker_fixture import DEFAULT_IMAGE, image_identity
 from autoseal.storage import ContentAddressedStore, IntegrityError, canonical_json
 
@@ -23,6 +24,9 @@ def main():
     config, report = verify_audit_generation(store, args.generation_archive_id)
     if report['status'] != 'COMPLETE':
         raise IntegrityError('retain incomplete generations; do not turn their surviving samples into a full comparison')
+    training = store.get_json(store.get_json(config['training_archive_id'])['manifest_id'])
+    protocol = store.get_json(training['training_configuration_id'])['analysis_protocol']
+    require_analysis_source(store, protocol, {'analysis_implementation_id': protocol['implementation_id']})
     args.root.mkdir(parents=True, exist_ok=False)
     image = image_identity(DEFAULT_IMAGE)
     rows, refs, contexts = [], [], {}
@@ -33,6 +37,7 @@ def main():
         print(json.dumps({key: row[key] for key in ('model_id', 'request_id', 'classification')}), flush=True)
     summary = summarize_hidden(config, rows)
     evaluation = {'kind': 'artifact_study_hidden_evaluation', 'schema_version': 1,
+        'analysis_implementation_id': protocol['implementation_id'],
         'generation_archive_id': args.generation_archive_id, 'image': image, 'outcome_ids': refs, 'summary': summary}
     identity = store.put_json(evaluation)
     checked = verify_hidden_evaluation(store, identity)

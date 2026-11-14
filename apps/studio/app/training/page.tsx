@@ -1,5 +1,6 @@
-import { fetchApi, type SftCalibration, type TrainingPilotsResponse } from "@/lib/api";
+import { fetchApi, type ModelStudy, type SftCalibration, type TrainingPilotsResponse } from "@/lib/api";
 import { SftCalibrationPanel } from "./sft-calibration";
+import { ModelStudyPanel } from "./model-study";
 
 export const dynamic = "force-dynamic";
 
@@ -10,6 +11,9 @@ function formatReward(value: number): string {
 export default async function TrainingEvidence() {
   let data: TrainingPilotsResponse | null = null;
   let calibration: SftCalibration | null = null;
+  let study: ModelStudy | null = null;
+  try { study = await fetchApi<ModelStudy>("/api/research/model-study"); }
+  catch { /* Only verified retained studies supply comparison results. */ }
   try { calibration = await fetchApi<SftCalibration>("/api/research/sft-calibration"); }
   catch { /* A missing or corrupt calibration is never replaced with a result. */ }
   try { data = await fetchApi<TrainingPilotsResponse>("/api/research/training-pilots"); }
@@ -17,7 +21,8 @@ export default async function TrainingEvidence() {
   return <div className="page">
     <div className="eyebrow">OPEN-WEIGHT MODEL / ACTUAL A100 TRAINING</div>
     <h1 className="page-title">A completed job is not<br /><em>a learned policy.</em></h1>
-    <p className="lead compact">Inspect the actual SFT calibration and earlier GRPO bridge pilots. Trusted model work runs on Sol A100s; candidate evaluation runs in Mac Docker. Archive verification keeps optimizer progress, task quality and reward-hacking claims separate.</p>
+    <p className="lead compact">Inspect paired model audits, SFT calibration and earlier GRPO bridge pilots. Trusted model work runs on Sol A100s; candidate evaluation runs in Mac Docker. Archive verification keeps optimizer progress, task quality and reward-hacking claims separate.</p>
+    <ModelStudyPanel data={study} />
     <SftCalibrationPanel data={calibration} />
     {data?.preflights?.length ? <section className="panel wide">
       <div className="repair-card-head"><span className="section-kicker">LATEST ONE-ARM PREFLIGHTS</span><span className="reject repair-status">NOT A PAIRED STUDY</span></div>
@@ -50,6 +55,6 @@ export default async function TrainingEvidence() {
         <details><summary>Inspect exact lineage</summary><p className="mono">Configuration: {pilot.configuration_id}<br />Model snapshot: {pilot.summary.model_snapshot_revision}<br />Archived content objects: {pilot.objects}</p></details>
       </section>;
     })}
-    <div className="notice">V1 still requires a varied frozen corpus, reviewed SFT data, exploit-bearing rollouts that separate the reward arms, held-out audit evaluation, and the complete three-seed paired study. Null or adverse findings will remain visible.</div>
+    <div className="notice">Full V1 still requires its complete external-case, preservation, enforcement, baseline, ablation and operated-delivery evidence. A model comparison on authored finite tasks has a narrower scope. Null and adverse findings remain visible.</div>
   </div>;
 }

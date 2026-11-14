@@ -22,6 +22,8 @@ The GitHub workflow is manually triggered. Publishing source does not launch hos
 
 On October 20, 2026, a clean export without the local raw archives passed **172 tests**, skipped **21 archive-dependent checks**, and deselected **27 Docker checks** under `-m 'not docker'`. The original working checkout, with its local archives present, passed **193 tests** under the same selection. Studio type checking and the production build passed. These were local checks using the existing environment; no hosted CI, fresh dependency installation, Docker evaluation, or GPU experiment ran for this source publication. The first export omitted the migration directory and failed its migration check; including the required files resolved that failure before the final clean run.
 
+A later November 13 source export, using the existing dependency environment and a fresh empty Git repository for metadata-dependent checks, passed **319 tests**, skipped **43 archive-dependent checks**, and deselected **54 Docker checks**. That export preceded the later model-comparison view. Its first run lacked required Git metadata and failed one ignore-rule test; the corrected run is a source-packaging check, not a fresh-install or hosted-CI result.
+
 ## Optional experiment archives
 
 The checkout omits raw content-addressed stores under `examples/model_agent/evidence/`, `examples/upstream_swebench/native/evidence/`, and `examples/training_pilot/*/objects/`. Compact indexes and summary reports retain their historical identities and limitations. Those references do not imply the raw blobs are publicly downloadable.

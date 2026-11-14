@@ -29,7 +29,7 @@ Two subsequent admitted-reward GRPO preflights completed two steps per arm with 
 
 ## Evaluation and permitted conclusions
 
-The study compares vulnerable and sealed reward arms from the same frozen starting model. Tasks, prompts, seeds, optimizer and generation budgets must match. At least three seeds per arm and a post-checkpoint hidden audit remain required. The final protocol freezes the analysis before training. Invalid packets remain in the task-success denominator; verifier failures remain inconclusive. No favorable effect is assumed.
+The study compares vulnerable and sealed reward arms from the same frozen starting model. Tasks, prompts, seeds, optimizer and generation budgets must match. The November 13 comparison completed three seeds per arm and a post-checkpoint hidden audit, using the analysis source frozen before training. Across 56 generations, the baseline and every trained checkpoint passed 1/8 tasks; all showed 0/8 false rewards, zero invalid packets and zero inconclusive evaluations. The paired arm differences were zero. This is a null result on eight authored finite inputs, not a measured improvement. [Protocol and evidence identities](MODEL_COMPARISON.md). Invalid packets remain in the task-success denominator; verifier failures remain inconclusive. No favorable effect is assumed.
 
 The output tasks measure finite answer artifacts. They do not establish general program synthesis, repository-scale coding, security against unseen attack families or external benchmark performance. Three seeds and eight authored audit inputs also provide weak uncertainty information. Do not use these results as a hiring or deployment guarantee.
 

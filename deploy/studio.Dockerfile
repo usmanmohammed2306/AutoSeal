@@ -15,6 +15,9 @@ WORKDIR /app
 COPY --from=build --chown=node:node /app/node_modules ./node_modules
 COPY --from=build --chown=node:node /app/.next ./.next
 COPY --from=build --chown=node:node /app/package.json /app/next.config.ts ./
+COPY --from=build --chown=node:node /app/app ./reference-source/app
+COPY --from=build --chown=node:node /app/lib ./reference-source/lib
+COPY --from=build --chown=node:node /app/package.json /app/pnpm-lock.yaml /app/proxy.ts /app/next.config.ts /app/tsconfig.json ./reference-source/
 USER node
 EXPOSE 3000
 CMD ["node", "node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0", "--port", "3000"]

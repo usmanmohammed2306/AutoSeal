@@ -20,7 +20,7 @@ class ArchiveOnly:
             return await self.app(scope, receive, send)
         path, method = scope['path'], scope['method']
         saved = (path in {'/api/health', '/api/access', '/api/cases', '/api/research/managed-repair',
-                '/api/research/terminal-shell', '/api/research/sft-calibration'}
+                '/api/research/terminal-shell', '/api/research/sft-calibration', '/api/research/model-study'}
             or path.startswith(('/api/runs', '/api/workflows', '/api/research/native-swebench', '/api/research/training-pilots')))
         if method not in {'GET', 'HEAD'} or not saved:
             body = json.dumps({'detail': 'This delivery profile serves saved evidence only.'}).encode()
@@ -45,7 +45,8 @@ def create_app():
         raise RuntimeError('candidate execution is disabled in archive delivery')
     options = {}
     for prefix, root_key, id_key in [('MANAGED', 'managed_report_root', 'managed_report_identity'),
-            ('SHELL', 'shell_archive_root', 'shell_archive_identity'), ('SFT', 'sft_archive_root', 'sft_evaluation_identity')]:
+            ('SHELL', 'shell_archive_root', 'shell_archive_identity'), ('SFT', 'sft_archive_root', 'sft_evaluation_identity'),
+            ('STUDY', 'study_archive_root', 'study_evaluation_identity')]:
         directory, identity = os.environ.get('AUTOSEAL_' + prefix + '_ROOT'), os.environ.get('AUTOSEAL_' + prefix + '_ID')
         if directory or identity:
             if not directory or not identity:

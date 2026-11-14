@@ -26,7 +26,11 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', type=Path, required=True)
     parser.add_argument('--https', action='store_true', help='Also verify local TLS using an isolated private CA.')
+    parser.add_argument('--recovery', action='store_true', help='Back up an actual Docker fixture receipt and restore PostgreSQL/CAS into a separate local stack.')
+    parser.add_argument('--rollback-image', help='With --recovery, check a distinct reviewed local API image by immutable sha256 identity.')
     args = parser.parse_args()
+    if args.rollback_image and not args.recovery:
+        parser.error('--rollback-image requires --recovery')
     args.root.mkdir(parents=True, exist_ok=False)
     project = 'autoseal_archive_' + uuid.uuid4().hex[:12]
     with socket.socket() as sock:
@@ -64,7 +68,9 @@ def main():
 q=json.load(sys.stdin);headers={'Authorization':'Bearer '+q['token']} if q['token'] else {}
 r=urllib.request.Request('http://127.0.0.1:8000'+q['path'],method=q['method'],headers=headers)
 try:
- with urllib.request.urlopen(r,timeout=5) as p: print(json.dumps({'status':p.status,'body':p.read(4096).decode()}))
+ with urllib.request.urlopen(r,timeout=5) as p:
+  raw=p.read(2*1024*1024+1); assert len(raw)<=2*1024*1024
+  print(json.dumps({'status':p.status,'body':raw.decode()}))
 except urllib.error.HTTPError as p:print(json.dumps({'status':p.code,'body':p.read(4096).decode()}))
 '''
         return json.loads(command(compose + ['exec', '-T', 'api', 'python', '-c', code], input=payload).stdout)
@@ -126,6 +132,21 @@ except urllib.error.HTTPError as p:print(json.dumps({'status':p.code,'body':p.re
         isolation = command(compose + ['exec', '-T', 'api', 'python', '-c',
             "from pathlib import Path; import shutil; assert not any((Path('/app')/p).exists() for p in ['research','.git','.env','AGENTS.md']); assert shutil.which('docker') is None; print('isolated')"])
         passed('private_planning_and_docker_cli_absent', isolation.stdout.strip() == b'isolated')
+        runtime_paths = sorted([*Path('src/autoseal').glob('*.py'), *Path('migrations').rglob('*.py'), Path('deploy/archive_api.py')])
+        expected = {str(path): hashlib.sha256(path.read_bytes()).hexdigest() for path in runtime_paths}
+        code = "import hashlib,json,sys; from pathlib import Path; names=json.load(sys.stdin); print(json.dumps({name:hashlib.sha256((Path('/app')/name).read_bytes()).hexdigest() for name in names}))"
+        observed = json.loads(command(compose + ['exec', '-T', 'api', 'python', '-c', code], input=json.dumps(list(expected)).encode()).stdout)
+        passed('api_runtime_sources_match_checkout', observed == expected)
+        report['runtime_source_files'] = expected
+        studio = Path('apps/studio')
+        frontend_paths = sorted([*(studio / 'app').rglob('*.tsx'), *(studio / 'app').rglob('*.ts'),
+            *(studio / 'app').rglob('*.css'), *(studio / 'lib').rglob('*.ts'),
+            *(studio / name for name in ['package.json', 'pnpm-lock.yaml', 'proxy.ts', 'next.config.ts', 'tsconfig.json'])])
+        frontend = {str(path.relative_to(studio)): hashlib.sha256(path.read_bytes()).hexdigest() for path in frontend_paths}
+        code = "const fs=require('fs'),crypto=require('crypto'); const names=JSON.parse(fs.readFileSync(0,'utf8')); console.log(JSON.stringify(Object.fromEntries(names.map(name=>[name,crypto.createHash('sha256').update(fs.readFileSync('/app/reference-source/'+name)).digest('hex')]))))"
+        observed = json.loads(command(compose + ['exec', '-T', 'studio', 'node', '-e', code], input=json.dumps(list(frontend)).encode()).stdout)
+        passed('studio_build_source_snapshot_matches_checkout', observed == frontend)
+        report['frontend_source_files'] = frontend
         if args.https:
             deadline = time.monotonic() + 45
             while True:
@@ -150,6 +171,16 @@ except urllib.error.HTTPError as p:print(json.dumps({'status':p.code,'body':p.re
             passed('tls_proxy_is_nonroot_without_capabilities', proxy['Config']['User'] == '10001:10001'
                 and proxy['HostConfig']['CapDrop'] == ['ALL'] and proxy['HostConfig']['ReadonlyRootfs'])
             report['limitations'].append('Local TLS uses only an isolated test CA trusted by this client, not the host trust store or a public CA.')
+        if args.recovery:
+            from archive_recovery import validate_recovery
+            for path in map(Path, ['scripts/archive_recovery.py', 'scripts/archive_snapshot.py']):
+                report['source_files'][str(path)] = 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
+            validate_recovery(compose=compose, command=command,
+                api=lambda path: api(path, token=env['AUTOSEAL_READER_TOKEN']), passed=passed, root=args.root,
+                report=report, rollback_image=args.rollback_image)
+            report['limitations'] = [item for item in report['limitations']
+                if not item.startswith(('Empty-state/', 'Disposable credentials'))]
+            report['limitations'].append('One imported reviewed fixture and a quiescent local database/CAS restore; no operated AWS, model archive import, production RPO/RTO or load guarantee. Credentials are omitted.')
         report['status'] = 'PASSED'
     except Exception as exc:
         report['error'] = f'{type(exc).__name__}: {exc}'

@@ -250,15 +250,29 @@ def build_parser() -> argparse.ArgumentParser:
     server_parser.add_argument("--shell-archive-id")
     server_parser.add_argument("--sft-archive-root", type=Path)
     server_parser.add_argument("--sft-evaluation-id")
+    server_parser.add_argument('--study-archive-root', type=Path)
+    server_parser.add_argument('--study-evaluation-id')
     release_parser = subparsers.add_parser("release-check", help="Verify retained evidence and name every open V1 release obligation.")
     release_parser.add_argument("--root", type=Path, required=True, help="Local archive root containing referenced relative directories.")
     release_parser.add_argument("--manifest", type=Path, required=True)
+    study_parser = subparsers.add_parser('model-study', help='Recheck a retained paired model comparison without executing candidates.')
+    study_parser.add_argument('--root', type=Path, required=True)
+    study_parser.add_argument('--evaluation-id', required=True)
     return parser
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
     arguments = parser.parse_args(argv)
+
+    if arguments.action == 'model-study':
+        from autoseal.artifact_study_review import study_review
+        try:
+            report = study_review(arguments.root, arguments.evaluation_id)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+            parser.exit(2, f'model study evidence invalid: {exc}\n')
+        print(json.dumps(report, indent=2))
+        return 0 if report['summary']['audit_complete'] else 1
 
     if arguments.action == "release-check":
         from autoseal.release import ReleaseCandidate, inspect_release
@@ -543,6 +557,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                        shell_archive_identity=arguments.shell_archive_id,
                        sft_archive_root=arguments.sft_archive_root,
                        sft_evaluation_identity=arguments.sft_evaluation_id,
+                       study_archive_root=arguments.study_archive_root,
+                       study_evaluation_identity=arguments.study_evaluation_id,
                        operator_token=os.environ.get("AUTOSEAL_OPERATOR_TOKEN"),
                        reader_token=os.environ.get("AUTOSEAL_READER_TOKEN")),
             host="127.0.0.1",

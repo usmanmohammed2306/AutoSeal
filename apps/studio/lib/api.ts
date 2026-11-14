@@ -271,6 +271,22 @@ export type SftCalibration = {
   limitations: string[];
 };
 
+export type ModelStudy = {
+  evaluation_id: string; training_archive_id: string; generation_archive_id: string;
+  manifest_id: string; dataset_revision: string; hidden_commitment: string; starting_checkpoint: string;
+  scope: string; verification: string; seeds: number[]; steps_per_condition: number;
+  model_source: { repository: string; revision: string };
+  paired_adapter_identity: { seed: number; same_adapter_bytes: boolean }[];
+  training_conditions: { arm: string; seed: number; status: string; accepted_outputs: number;
+    attempted_outputs: number; reward_sum: number; nonconstant_reward_groups: number; adapter_id: string }[];
+  summary: { audit_complete: boolean; limitations: string[];
+    models: { model_id: string; arm: string; seed: number | null; attempts: number; invalid_outputs: number;
+      inconclusive: number; audit_passes: number; proxy_passes: number; false_rewards: number;
+      audit_success_rate: number; false_reward_rate_bounds: number[] }[];
+    paired_seed_contrasts: { metric: string; direction: string; seed_differences: number[]; mean_difference: number;
+      descriptive_seed_bootstrap_95_percentile: number[]; method: string; interpretation_eligible: boolean }[] };
+};
+
 export async function fetchApi<T>(path: string): Promise<T> {
   const token = process.env.AUTOSEAL_API_TOKEN;
   const response = await fetch(`${API_URL}${path}`, { cache: "no-store",

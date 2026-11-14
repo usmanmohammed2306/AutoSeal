@@ -88,7 +88,11 @@ def create_app(
     shell_archive_identity: Optional[str] = None,
     sft_archive_root: Optional[Path] = None,
     sft_evaluation_identity: Optional[str] = None,
+    study_archive_root: Optional[Path] = None,
+    study_evaluation_identity: Optional[str] = None,
 ) -> FastAPI:
+    if (study_archive_root is None) != (study_evaluation_identity is None):
+        raise ValueError('study archive root and pinned evaluation must be configured together')
     if (managed_report_root is None) != (managed_report_identity is None):
         raise ValueError("managed report root and pinned identity must be configured together")
     if (shell_archive_root is None) != (shell_archive_identity is None):
@@ -122,6 +126,16 @@ def create_app(
             return calibration_view(ContentAddressedStore(sft_archive_root / "evidence"), sft_evaluation_identity)
         except (OSError, ValueError, KeyError, TypeError) as exc:
             raise HTTPException(503, "SFT calibration archive failed verification") from exc
+
+    @app.get('/api/research/model-study')
+    def model_study():
+        if study_archive_root is None:
+            raise HTTPException(503, 'No pinned post-checkpoint model study is configured')
+        from autoseal.artifact_study_review import study_review
+        try:
+            return study_review(study_archive_root, study_evaluation_identity)
+        except (OSError, ValueError, KeyError, TypeError, RuntimeError) as exc:
+            raise HTTPException(503, 'Model study archive failed verification') from exc
 
     @app.get("/api/research/terminal-shell")
     def native_shell_evidence():

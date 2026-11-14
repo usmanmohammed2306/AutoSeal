@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from autoseal.artifact_cases import registered_tasks
 from autoseal.artifact_pipeline import _manager, verify_artifact_validation
+from autoseal.artifact_study_review import study_review
 from autoseal.native_scorecard import score_native_archive
 from autoseal.native_shell_archive import verify_shell_report
 from autoseal.sft_archive import verify_sft_evaluation
@@ -38,6 +39,7 @@ class ReleaseCandidate(BaseModel):
     native_shell: Optional[EvidenceReference] = None
     native_swebench_directory: Optional[str] = None
     sft_calibration: Optional[EvidenceReference] = None
+    paired_model_study: Optional[EvidenceReference] = None
 
 
 def _directory(root, relative):
@@ -106,6 +108,8 @@ def inspect_release(root: Path, candidate: ReleaseCandidate):
         score_native_archive(_directory(root, directory)))
     calibration = inspect('sft_format_calibration', candidate.sft_calibration, lambda ref:
         verify_sft_evaluation(ContentAddressedStore(_directory(root, ref.directory) / 'evidence'), ref.identity))
+    study = inspect('paired_model_study_archive', candidate.paired_model_study, lambda ref:
+        study_review(_directory(root, ref.directory), ref.identity))
     # These receipts establish reproduction or calibration. They do not carry
     # the missing promotion, hidden-audit or operated-delivery obligations.
     gate('external_corpus_and_native_repairs', 'MISSING',
@@ -114,10 +118,12 @@ def inspect_release(root: Path, candidate: ReleaseCandidate):
         'Reproduction alone cannot satisfy repair admission.')
     gate('clean_and_nonrepairable_corpus', 'MISSING',
         'Require at least three clean and two to three explicitly nonrepairable cases with checked routing receipts.')
-    gate('matched_training_and_hidden_audits', 'MISSING',
+    gate('matched_training_and_hidden_audits', 'VERIFIED' if study and study['summary']['audit_complete'] else 'MISSING',
+        ('Verified three-or-more-seed arms, shared SFT checkpoint, raw rewards, final checkpoints, hidden generations and Docker audits. '
+         'This is an authored finite-input comparison; read all outcomes and limitations. It does not accept the external corpus or establish an improvement.' if study and study['summary']['audit_complete'] else
         'Require a frozen vulnerable/sealed study, at least three seeds per arm, matched starting checkpoint and budgets, '
         'raw reward/checkpoint lineage, frozen hidden audits, all failures/exclusions and seed-level analysis. '
-        + ('The supplied single-seed SFT calibration does not meet this requirement.' if calibration else 'No complete study receipt supplied.'))
+        + ('The supplied single-seed SFT calibration does not meet this requirement.' if calibration else 'No complete study receipt supplied.')))
     for name, detail in (
         ('repair_and_training_ablations', 'Require the frozen repair and training ablation tables derived from checked raw receipts.'),
         ('authenticated_end_to_end_product', 'Require the release-bound CLI/API/PostgreSQL/CAS/worker/browser path including denial, cancellation and recovery.'),
