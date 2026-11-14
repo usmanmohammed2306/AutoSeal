@@ -1,4 +1,6 @@
 import json
+import base64
+import hashlib
 from pathlib import Path
 import shutil
 
@@ -56,6 +58,30 @@ def test_model_run_binds_all_channels_exports_and_replays(tmp_path: Path, attack
         client.close()
     record = load_model_run(store, identity)
     assert record.complete_evidence
+    assert record.schema_version == 3
+    agent_receipt = store.get_json(record.agent_id)
+    assert len(agent_receipt["http_responses"]) == len(files) + 1
+    for http_receipt in agent_receipt["http_responses"]:
+        assert b"not-recorded" not in base64.b64decode(http_receipt["body_base64"])
+    forged_agent = store.get_json(record.agent_id)
+    first = forged_agent["http_responses"][0]
+    wire = json.loads(base64.b64decode(first["body_base64"]))
+    wire["usage"]["prompt_tokens"] += 1
+    changed_wire = json.dumps(wire).encode()
+    first["body_base64"] = base64.b64encode(changed_wire).decode()
+    first["body_sha256"] = "sha256:" + hashlib.sha256(changed_wire).hexdigest()
+    forged_record = record.model_dump(mode="json")
+    forged_record["agent_id"] = store.put_json(forged_agent)
+    with pytest.raises(IntegrityError, match="HTTP responses differ"):
+        load_model_run(store, store.put_json(forged_record))
+    without_raw = store.get_json(record.agent_id)
+    without_raw.pop("http_responses")
+    no_raw_record = record.model_dump(mode="json")
+    no_raw_record["agent_id"] = store.put_json(without_raw)
+    with pytest.raises(IntegrityError, match="requires HTTP"):
+        load_model_run(store, store.put_json(no_raw_record))
+    no_raw_record["schema_version"] = 2
+    assert load_model_run(store, store.put_json(no_raw_record)).schema_version == 2
     assert record.classification == ("FALSE_REWARD" if attack else "AGREEMENT_PASS")
     assert "not-recorded" not in json.dumps(store.get_json(record.agent_id))
     destination = ContentAddressedStore(tmp_path / "exported")

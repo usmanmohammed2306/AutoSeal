@@ -5,6 +5,9 @@ from __future__ import annotations
 from pathlib import Path, PurePosixPath
 from datetime import datetime, timezone
 import shutil
+import base64
+import hashlib
+import json
 import tempfile
 from typing import Literal, Optional
 
@@ -21,7 +24,7 @@ from autoseal.storage import ContentAddressedStore, IntegrityError
 class ModelRun(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    schema_version: Literal[1, 2] = 2
+    schema_version: Literal[1, 2, 3] = 3
     kind: Literal["model_tool_run"] = "model_tool_run"
     deployment_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
     task_id: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
@@ -38,8 +41,8 @@ class ModelRun(BaseModel):
 
     @model_validator(mode="after")
     def check_shape(self) -> "ModelRun":
-        if self.schema_version == 2 and self.implementation_id is None:
-            raise ValueError("version 2 model evidence requires implementation lineage")
+        if self.schema_version >= 2 and self.implementation_id is None:
+            raise ValueError("version 2 or later model evidence requires implementation lineage")
         for name in self.files:
             path = PurePosixPath(name)
             if path.is_absolute() or ".." in path.parts or path.as_posix() != name or not path.parts:
@@ -80,6 +83,7 @@ def record_model_run(
         agent_id = store.put_json({
             "messages": list(result.messages),
             "outputs": [item.model_dump(mode="json") for item in result.outputs],
+            "http_responses": list(result.http_responses),
             "observations": [{"action": item.action.model_dump(mode="json"),
                               "process": item.process.to_dict(),
                               "environment_state": item.environment_state.value}
@@ -135,7 +139,7 @@ def _materialize(store: ContentAddressedStore, record: ModelRun, workspace: Path
 
 def load_model_run(store: ContentAddressedStore, identity: str) -> ModelRun:
     record = ModelRun.model_validate(store.get_json(identity))
-    ModelDeployment.model_validate(store.get_json(record.deployment_id))
+    deployment = ModelDeployment.model_validate(store.get_json(record.deployment_id))
     task = store.get_bytes(record.task_id).decode("utf-8")
     if record.implementation_id:
         for reference in store.get_json(record.implementation_id).values():
@@ -153,6 +157,35 @@ def load_model_run(store: ContentAddressedStore, identity: str) -> ModelRun:
         raise IntegrityError("model task identity mismatch")
     from autoseal.model_agent import ModelOutput
     outputs = [ModelOutput.model_validate(item) for item in agent["outputs"]]
+    if record.schema_version >= 3 and "http_responses" not in agent:
+        raise IntegrityError("version 3 model evidence requires HTTP response receipts")
+    if "http_responses" in agent:
+        from autoseal.model_agent import _parse_output
+        receipts = agent["http_responses"]
+        if not isinstance(receipts, list):
+            raise IntegrityError("model HTTP response receipts must be a list")
+        parsed_outputs = []
+        for position, receipt in enumerate(receipts):
+            try:
+                if set(receipt) != {"status_code", "body_base64", "body_sha256"}:
+                    raise ValueError("unexpected HTTP receipt fields")
+                raw = base64.b64decode(receipt["body_base64"], validate=True)
+                if "sha256:" + hashlib.sha256(raw).hexdigest() != receipt["body_sha256"]:
+                    raise ValueError("HTTP body digest differs")
+                status = receipt["status_code"]
+                if type(status) is not int or not 100 <= status <= 599:
+                    raise ValueError("invalid HTTP status")
+            except (ValueError, TypeError, KeyError) as exc:
+                raise IntegrityError("model HTTP response integrity failed") from exc
+            try:
+                if not 200 <= status < 300:
+                    raise ValueError("unsuccessful model HTTP response")
+                parsed_outputs.append(_parse_output(deployment, json.loads(raw)))
+            except (ValueError, TypeError, KeyError):
+                if position != len(receipts) - 1 or record.agent_stopped_reason != "MODEL_FAILURE":
+                    raise IntegrityError("model HTTP failure differs from terminal state")
+        if [item.model_dump(mode="json") for item in parsed_outputs] != [item.model_dump(mode="json") for item in outputs]:
+            raise IntegrityError("model HTTP responses differ from normalized outputs")
     if sum(item.prompt_tokens for item in outputs) != agent["prompt_tokens"] or sum(item.completion_tokens for item in outputs) != agent["completion_tokens"]:
         raise IntegrityError("model token usage mismatch")
     evaluations = {channel: store.get_json(reference) for channel, reference in record.evaluations.items()}
