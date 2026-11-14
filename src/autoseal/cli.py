@@ -2,6 +2,7 @@
 
 import argparse
 import json
+import os
 from pathlib import Path
 import time
 from typing import Optional, Sequence
@@ -174,6 +175,23 @@ def build_parser() -> argparse.ArgumentParser:
         default=RepairOperator.ARTIFACT_PROJECTION.value,
     )
     promotion_parser.add_argument("--required-passes", type=_non_negative_integer, default=0)
+    managed = subparsers.add_parser("managed-repair", help="Run and inspect real Mac Docker repair validation and managed rollback.")
+    managed_actions = managed.add_subparsers(dest="managed_action", required=True)
+    managed_validate = managed_actions.add_parser("validate")
+    managed_validate.add_argument("--root", type=Path, required=True, help="New directory for this immutable validation attempt.")
+    managed_verify = managed_actions.add_parser("verify")
+    managed_verify.add_argument("identity")
+    managed_verify.add_argument("--root", type=Path, required=True)
+    artifact = subparsers.add_parser("artifact-repair", help="Run registered artifact-output repair, promotion and rollback.")
+    artifact_actions = artifact.add_subparsers(dest="artifact_action", required=True)
+    artifact_actions.add_parser("cases")
+    for action in ("validate", "verify", "promote", "demo"):
+        command = artifact_actions.add_parser(action)
+        command.add_argument("target", help="Registered case name, or a validation digest for verify/promote.")
+        command.add_argument("--root", type=Path, required=True)
+    artifact_rollback = artifact_actions.add_parser("rollback")
+    artifact_rollback.add_argument("--root", type=Path, required=True)
+    artifact_rollback.add_argument("--expected-child", required=True)
     subparsers.add_parser(
         "repair-plan-preview",
         help="Inspect a composed typed plan and exact policy inverse, without a production seal.",
@@ -219,16 +237,38 @@ def build_parser() -> argparse.ArgumentParser:
     worker_parser.add_argument("--database-url", required=True)
     worker_parser.add_argument("--store", type=Path, required=True)
     worker_parser.add_argument("--once", action="store_true")
+    worker_parser.add_argument("--workflow-root", type=Path)
     server_parser = subparsers.add_parser("serve", help="Run the local research API.")
     server_parser.add_argument("--database-url", required=True)
     server_parser.add_argument("--store", type=Path, required=True)
     server_parser.add_argument("--port", type=int, default=8000)
+    server_parser.add_argument("--managed-report-root", type=Path)
+    server_parser.add_argument("--managed-report-id", help="Pinned digest of a retained managed validation report.")
+    server_parser.add_argument("--workflow-root", type=Path)
+    server_parser.add_argument("--require-auth", action="store_true", help="Require AUTOSEAL_OPERATOR_TOKEN; optionally configure AUTOSEAL_READER_TOKEN.")
+    server_parser.add_argument("--shell-archive-root", type=Path)
+    server_parser.add_argument("--shell-archive-id")
+    server_parser.add_argument("--sft-archive-root", type=Path)
+    server_parser.add_argument("--sft-evaluation-id")
+    release_parser = subparsers.add_parser("release-check", help="Verify retained evidence and name every open V1 release obligation.")
+    release_parser.add_argument("--root", type=Path, required=True, help="Local archive root containing referenced relative directories.")
+    release_parser.add_argument("--manifest", type=Path, required=True)
     return parser
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
     arguments = parser.parse_args(argv)
+
+    if arguments.action == "release-check":
+        from autoseal.release import ReleaseCandidate, inspect_release
+        try:
+            candidate = ReleaseCandidate.model_validate_json(arguments.manifest.read_bytes())
+            report = inspect_release(arguments.root, candidate)
+            print(json.dumps(report, indent=2))
+            return 0 if report["release_eligible"] else 1
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            parser.exit(2, f"release evidence invalid: {exc}\n")
 
     if arguments.action == "evaluate":
         try:
@@ -380,6 +420,57 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         print(result.model_dump_json(indent=2))
         return 0
 
+    if arguments.action == "managed-repair":
+        from autoseal.managed_repair import validate_managed_fixture, verify_managed_report
+        try:
+            identity = (validate_managed_fixture(arguments.root) if arguments.managed_action == "validate"
+                        else arguments.identity)
+            report = verify_managed_report(arguments.root, identity)
+        except (OSError, RuntimeError, ValueError, KeyError) as exc:
+            parser.exit(2, f"managed validation failed: {exc}\n")
+        print(json.dumps({"report_id": identity, "report": report}, indent=2, sort_keys=True))
+        # A valid abstention is successfully recorded evidence. It does not
+        # mean the proposed repair passed the promotion firewall.
+        return 0
+
+    if arguments.action == "artifact-repair":
+        from autoseal.artifact_cases import registered_tasks
+        from autoseal.artifact_pipeline import (deployment_manager, evaluate_artifact, promote_artifact,
+            resolve_artifact, rollback_artifact, validate_artifact_case, verify_artifact_validation)
+        tasks = registered_tasks()
+        try:
+            if arguments.artifact_action == "cases":
+                result = {"origin": "seeded", "cases": [task.model_dump(mode="json") for task in tasks.values()]}
+            elif arguments.artifact_action == "rollback":
+                result = {"rollback_id": rollback_artifact(arguments.root, arguments.expected_child)}
+            else:
+                store = ContentAddressedStore(arguments.root / "evidence")
+                target = arguments.target
+                if arguments.artifact_action in {"validate", "demo"}:
+                    if target not in tasks:
+                        raise ValueError("unknown registered artifact task")
+                    target = validate_artifact_case(arguments.root, tasks[target])
+                report = verify_artifact_validation(store, target)
+                result = {"validation_id": target, "report": report}
+                if arguments.artifact_action in {"promote", "demo"}:
+                    result["promotion"] = promote_artifact(arguments.root, target)
+                if arguments.artifact_action == "demo":
+                    case = store.get_json(report["case_id"])
+                    candidate = case["controls"][4]["candidate_id"]
+                    child = deployment_manager(arguments.root).active()
+                    sealed = evaluate_artifact(store, report["case_id"], candidate, child, "sealed")
+                    result["sealed_verdict"] = resolve_artifact(store, sealed, case_id=report["case_id"], candidate_id=candidate,
+                        revision_id=child, channel="sealed")["verdict"]
+                    result["production_rollback_id"] = rollback_artifact(arguments.root, child)
+                    restored = evaluate_artifact(store, report["case_id"], candidate, report["parent_revision"], "proxy")
+                    result["restored_verdict"] = resolve_artifact(store, restored, case_id=report["case_id"], candidate_id=candidate,
+                        revision_id=report["parent_revision"], channel="proxy")["verdict"]
+                    result["reactivation"] = promote_artifact(arguments.root, target)
+            print(json.dumps(result, indent=2, sort_keys=True))
+            return 0
+        except (OSError, RuntimeError, ValueError, KeyError, TypeError) as exc:
+            parser.exit(2, f"artifact repair failed: {exc}\n")
+
     if arguments.action == "repair-plan-preview":
         print(json.dumps(local_composed_policy_preview(), indent=2))
         return 0
@@ -419,14 +510,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if arguments.action == "worker":
         from autoseal.db import make_session_factory
         from autoseal.service import RunService
-        service = RunService(
-            make_session_factory(arguments.database_url),
-            ContentAddressedStore(arguments.store),
-        )
+        from autoseal.workflows import WorkflowService
+        sessions = make_session_factory(arguments.database_url)
+        store = ContentAddressedStore(arguments.store)
+        service = RunService(sessions, store)
+        workflows = WorkflowService(sessions, store, arguments.workflow_root or
+            arguments.store.parent / (arguments.store.name + "-workflows"))
         while True:
-            row = service.process_one()
+            row = workflows.process_one()
+            kind = "workflow"
+            if row is None:
+                row, kind = service.process_one(), "run"
             if row is not None:
-                print(json.dumps({"id": row.id, "state": row.state, "classification": row.classification}))
+                print(json.dumps({"id": row.id, "state": row.state, "kind": kind}), flush=True)
             if arguments.once:
                 return 0
             if row is None:
@@ -436,8 +532,19 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         import uvicorn
         from autoseal.api import create_app
 
+        if arguments.require_auth and not os.environ.get("AUTOSEAL_OPERATOR_TOKEN"):
+            parser.error("--require-auth needs AUTOSEAL_OPERATOR_TOKEN in the environment")
         uvicorn.run(
-            create_app(arguments.database_url, arguments.store),
+            create_app(arguments.database_url, arguments.store,
+                       managed_report_root=arguments.managed_report_root,
+                       managed_report_identity=arguments.managed_report_id,
+                       workflow_root=arguments.workflow_root,
+                       shell_archive_root=arguments.shell_archive_root,
+                       shell_archive_identity=arguments.shell_archive_id,
+                       sft_archive_root=arguments.sft_archive_root,
+                       sft_evaluation_identity=arguments.sft_evaluation_id,
+                       operator_token=os.environ.get("AUTOSEAL_OPERATOR_TOKEN"),
+                       reader_token=os.environ.get("AUTOSEAL_READER_TOKEN")),
             host="127.0.0.1",
             port=arguments.port,
         )

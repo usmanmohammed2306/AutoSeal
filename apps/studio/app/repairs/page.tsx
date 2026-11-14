@@ -1,4 +1,4 @@
-import { fetchApi, type PromotionReviewResponse, type RepairPlanPreviewResponse, type RepairPreviewResponse } from "@/lib/api";
+import { fetchApi, type ManagedRepairResponse, type PromotionReviewResponse, type RepairPlanPreviewResponse, type RepairPreviewResponse } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
 
@@ -26,16 +26,30 @@ const gateLabels: Record<string, string> = {
 };
 
 export default async function Repairs() {
-  const [preview, promotion, composed] = await Promise.all([
+  const [preview, promotion, composed, managed] = await Promise.all([
     fetchApi<RepairPreviewResponse>("/api/research/repair-preview").catch(() => null),
     fetchApi<PromotionReviewResponse>("/api/research/promotion-review").catch(() => null),
     fetchApi<RepairPlanPreviewResponse>("/api/research/repair-plan-preview").catch(() => null),
+    fetchApi<ManagedRepairResponse>("/api/research/managed-repair").catch(() => null),
   ]);
 
   return <div className="page">
     <div className="eyebrow">TYPED REPAIR SEARCH / PROMOTION FIREWALL</div>
     <h1 className="page-title">Block the exploit.<br /><em>Keep the contract.</em></h1>
     <p className="lead compact">A repair is not good just because the exploit stops. Valid solutions, ordinary negatives, a separately frozen re-attack, native parity, and the execution boundary all matter.</p>
+
+    <section className="panel wide"><span className="section-kicker">RETAINED DOCKER VALIDATION</span>
+      {!managed ? <><h2>No verified runtime archive available</h2><p>Configure a pinned managed-validation report on the local API. Missing or corrupt evidence cannot become a passing repair.</p></> : <>
+        <div className="repair-card-head"><h2>Measured behavior, verified rollback</h2><span className="repair-status reject">{managed.disposition}</span></div>
+        <p>Saved execution from {new Date(managed.run_metadata.started_at_utc).toISOString()}. {managed.run_metadata.evaluations} candidate evaluations{managed.run_metadata.capability_probe_executions ? ` and ${managed.run_metadata.capability_probe_executions} capability probe` : ""} in {managed.run_metadata.elapsed_seconds.toFixed(2)} seconds. This is the {managed.scope}. No repair was promoted.</p>
+        <div className="matrix-scroll"><table className="matrix"><thead><tr><th>Control</th><th>Proxy</th><th>Audit</th><th>Sealed repeats</th></tr></thead><tbody>{managed.controls.map(control => <tr key={control.name}><th>{control.name}<small>{control.role}</small></th><td>{control.proxy}</td><td>{control.audit}</td><td>{control.sealed.join(" / ")}</td></tr>)}</tbody></table></div>
+        <div className="gate-list">{Object.entries(managed.gates).map(([name, passed]) => <div className="gate-row" key={name}><span>{name.replaceAll("_", " ")}</span><strong className={passed ? "pass" : "reject"}>{passed ? "PASS" : "MISSING"}</strong></div>)}</div>
+        <p>The early-exit control remains {managed.stress.verdict}, with {managed.stress.counts.failed} functional failures. It is excluded from successful block counts.</p>
+        <p>{managed.verification}</p><p className="mono">Report: {managed.report_id}<br />Rollback: {managed.rollback_id}</p>
+        {managed.enforcement_probe && <details><summary>Owned-verifier capability probe: {managed.enforcement_probe.passed ? "passed" : "failed"}</summary><div className="gate-list">{Object.entries(managed.enforcement_probe.gates).map(([name, passed]) => <div className="gate-row" key={name}><span>{name.replaceAll("_", " ")}</span><strong className={passed ? "pass" : "reject"}>{passed ? "PASS" : "FAIL"}</strong></div>)}</div><p className="mono">Probe: {managed.enforcement_probe.identity}</p><ul>{managed.enforcement_probe.limitations.map(item => <li key={item}>{item}</li>)}</ul></details>}
+        <ul>{managed.limitations.map(item => <li key={item}>{item}</li>)}</ul>
+      </>}
+    </section>
 
     {!preview ? <div className="notice error">The local research API is unavailable. Start the API to inspect repair candidates.</div> : <>
       <div className="notice">{preview.scope}. Local eligibility is not a promotion decision.</div>

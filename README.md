@@ -21,9 +21,17 @@ Python CLI · FastAPI · PostgreSQL · Docker · Next.js · PyTorch / TRL toolin
 | Reproduce a false reward and compare verdicts | `python -m autoseal demo --summary` |
 | Trace candidate influence and minimize a witness | `python -m autoseal influence exploit` |
 | Inspect repair candidates and preservation checks | `python -m autoseal promotion-review` |
+| Validate, admit, replay and roll back a seeded artifact repair | [Repair workflows](docs/REPAIR_WORKFLOWS.md) |
+| Validate owned execution, retained receipts and managed rollback | [Managed validation](docs/MANAGED_VALIDATION.md) |
 | Queue runs and inspect persisted evidence | [Local platform setup](#the-local-full-stack-path) |
 | Read the measured results and their limits | [Results](docs/RESULTS.md) |
+| Understand ownership and execution boundaries | [Architecture](docs/ARCHITECTURE.md) |
+| Read the model, data and training limitations | [Model card](docs/MODEL_CARD.md) |
+| Build and check the trusted application containers | [Archive delivery](docs/ARCHIVE_DELIVERY.md) |
 | Reproduce source checks and configure optional archives | [Reproducibility](docs/REPRODUCIBILITY.md) |
+| Inspect a disclosed runtime-hijack reproduction | [Native shell-task evidence](docs/NATIVE_SHELL_CASE.md) |
+| Inspect actual SFT pause/resume and development results | [SFT calibration](docs/SFT_CALIBRATION.md) |
+| Check retained proof against the remaining release obligations | [Release evidence inspection](docs/RELEASE_CHECK.md) |
 
 ```mermaid
 flowchart LR
@@ -106,6 +114,8 @@ python -m autoseal run --timeout-seconds 2 -- python -c "print('hello')"
 
 The runner records process status, exit code, bounded output, truncation, duration, and timeout. A zero exit code means the process reported success. It does not prove that a candidate is correct. The `evidence-id` command validates a saved process result and computes a versioned digest.
 
+The separately scoped [managed validation path](docs/MANAGED_VALIDATION.md) records actual Docker executions, candidate snapshots and rollback evidence, then rechecks them offline and in Studio. It retains failed gates and cannot issue a promotion. Its local platform check exercises HTTP, separate workers, PostgreSQL, Docker and evidence recovery. These engineering checks do not replace external-case acceptance or the post-training study.
+
 ## Trusted GPU setup on ASU Sol
 
 The scripts in [`scripts/sol`](scripts/sol) request one class-eligible A100. `gpu_probe.sbatch` confirms the device, and `training_preflight.sbatch` checks CUDA computation and the installed training packages. `sft_smoke.sbatch` runs exactly one LoRA update on the two checked-in correct `is_even` solutions. Its job, input, code, adapter, and result hashes are in the [SFT evidence](examples/training_pilot/sol_sft_smoke_evidence.json). Three paired GRPO bridge pilots actually trained on Sol while Mac Docker supplied rewards. The first returned 24 invalid outputs, the second returned 24 correct answers, and the third returned 18 invalid outputs plus six valid incorrect answers. All three had zero within-batch reward variance. Tagged-output G failed on a candidate-syntax classification bug, H completed with zero rewards and zero gradients, and I used a separately frozen pass-fraction diagnostic reward that yielded a nonzero gradient in each arm. The two I arms generated identical completions, got identical rewards, and produced identical adapters because none of their samples attempted the exploit. Their [summary and limitations](examples/training_pilot/README.md) are included here; the raw archives remain local. These runs establish transport and a real diagnostic trainer update, not evaluator-repair efficacy or downstream model improvement.
@@ -168,3 +178,5 @@ The simple `demo`, `compare`, `finding`, `minimize`, and `repair-preview` comman
 The intended product will preserve the exact candidate and evaluator evidence, identify why a false reward happened, propose a typed verifier repair, and promote that repair only if it blocks attacks without breaking valid solutions. The later ML experiment will compare agents trained with vulnerable versus sealed rewards from the same starting checkpoint and budget.
 
 The current results support specific local engineering and evaluator findings. The remaining scientific gates are listed above so that a reader can distinguish the implementation from a completed efficacy study.
+
+The [registered repair workflow](docs/REPAIR_WORKFLOWS.md) adds fixed-output seeded cases with measured repair search, preservation, guarded admission, `SealEvidence`, fresh replay and exact rollback. Studio can submit these jobs to a separate durable worker and inspect their persisted results. External benchmark coverage and the required post-training comparison remain separate evidence gates.

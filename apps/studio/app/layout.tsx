@@ -23,6 +23,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
               <Link className="nav-item" href="/runs"><span className="nav-glyph">◎</span> Runs and evidence</Link>
               <Link className="nav-item" href="/investigation"><span className="nav-glyph">⌁</span> Investigation</Link>
               <Link className="nav-item" href="/repairs"><span className="nav-glyph">✧</span> Repair search</Link>
+              <Link className="nav-item" href="/workflows"><span className="nav-glyph">↻</span> Repair workflows</Link>
               <Link className="nav-item" href="/training"><span className="nav-glyph">◈</span> Training evidence</Link>
               <Link className="nav-item" href="/research"><span className="nav-glyph">◇</span> Research status</Link>
             </nav>

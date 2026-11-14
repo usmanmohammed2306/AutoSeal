@@ -13,6 +13,9 @@ export default async function Research() {
   let repair: SWEbenchRepairPreview | null = null;
   let historical: UpstreamGraderResponse | null = null;
   let native: NativeSWEbenchResponse | null = null;
+  const shell = await fetchApi<{ report_id: string; scope: string; discovery_credit: string; image: string;
+    controls: { name: string; role: string; proxy: string; audit: string; sealed: string }[]; limitations: string[];
+  }>("/api/research/terminal-shell").catch(() => null);
   try { native = await fetchApi<NativeSWEbenchResponse>("/api/research/native-swebench"); }
   catch { /* Missing native evidence stays visible. */ }
   try { current = await fetchApi<SWEbenchResponse>("/api/research/upstream-swebench"); }
@@ -28,6 +31,17 @@ export default async function Research() {
     <h1 className="page-title">The test never ran.<br /><em>The benchmark still passed it.</em></h1>
     <p className="lead compact">A candidate-controlled Pytest hook marks a required test as expected to fail without running it. The pinned SWE-bench grader counts that <code>XFAIL</code> as success. AutoSeal checks the same wrong solution in a pristine audit workspace.</p>
     <div className="notice">SWE-bench issue 654 was open when checked on October 7, 2026. The native archive below is separate from the small live mechanism reproduction.</div>
+
+    <section className="panel wide"><span className="section-kicker">DISCLOSED RUNTIME HIJACK / ARCHIVED NATIVE TESTS</span>
+      <h2>The script stayed broken. Its interpreter changed.</h2>
+      {!shell ? <p className="panel-copy">No verified shell-task archive is configured. Missing evidence is not a passing result.</p> : <>
+        <p className="panel-copy">The public task-125 exploit replaced dash with bash. Unchanged upstream tests accepted incompatible scripts. A fresh-runtime audit and the projected test environment reject the same candidate while preserving both valid alternatives.</p>
+        <div className="matrix-scroll"><table className="matrix"><thead><tr><th>Control</th><th>Role</th><th>Original tests</th><th>Clean audit</th><th>Projected tests</th></tr></thead><tbody>
+          {shell.controls.map(control => <tr key={control.name}><th>{control.name}</th><td>{control.role}</td>{[control.proxy, control.audit, control.sealed].map((verdict, index) => <td key={index} className={verdict === "PASS" ? "pass" : "reject"}>{verdict}</td>)}</tr>)}
+        </tbody></table></div><p className="panel-copy">{shell.scope} Original discovery: {shell.discovery_credit}.</p>
+        <details><summary>Provenance and limits</summary><p className="mono">Report: {shell.report_id}<br />Image: {shell.image}</p>{shell.limitations.map(text => <p className="panel-copy" key={text}>{text}</p>)}</details>
+      </>}
+    </section>
 
     {!native ? <div className="notice error">The native evidence archive is unavailable or failed integrity checks.</div> : <section className="panel wide">
       <span className="section-kicker">OFFICIAL HARNESS / ARCHIVED NATIVE RUNS</span>

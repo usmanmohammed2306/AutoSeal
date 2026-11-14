@@ -68,6 +68,32 @@ class ContentAddressedStore:
         return json.loads(self.get_bytes(identity))
 
 
+class VerificationSnapshot(ContentAddressedStore):
+    """Bounded verified bytes for exactly one offline verification traversal.
+
+    Every first read verifies its digest. Repeated references see the same
+    verified bytes during that traversal. A new request creates a new snapshot
+    and checks disk again. JSON is parsed afresh so callers cannot mutate a
+    shared object and change a later check. This is not a persistent CAS cache.
+    """
+
+    def __init__(self, source: ContentAddressedStore, *, max_bytes: int = 16 * 1024 * 1024):
+        super().__init__(source.root)
+        if max_bytes < 0:
+            raise ValueError("verification snapshot budget must be non-negative")
+        self._source, self._budget, self._used = source, max_bytes, 0
+        self._verified: dict[str, bytes] = {}
+
+    def get_bytes(self, identity: str) -> bytes:
+        if identity in self._verified:
+            return self._verified[identity]
+        content = self._source.get_bytes(identity)
+        if self._used + len(content) <= self._budget and len(self._verified) < 4096:
+            self._verified[identity] = content
+            self._used += len(content)
+        return content
+
+
 class ComparisonManifest(BaseModel):
     """Immutable links to the two evaluator records and their candidate."""
 

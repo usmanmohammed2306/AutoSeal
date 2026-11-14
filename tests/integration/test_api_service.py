@@ -49,6 +49,7 @@ def test_api_rejects_unknown_fixture_and_missing_run(tmp_path: Path) -> None:
     with TestClient(_test_app(tmp_path)) as client:
         assert client.post("/api/runs", json={"candidate": "../../etc"}).status_code == 400
         assert client.get("/api/runs/missing").status_code == 404
+        assert client.get("/api/research/managed-repair").status_code == 503
 
 
 def test_research_endpoints_return_real_fixture_evidence(tmp_path: Path) -> None:

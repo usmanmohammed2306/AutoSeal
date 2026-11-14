@@ -1,0 +1,28 @@
+{
+    admin off
+    auto_https disable_redirects
+    http_port 8080
+    https_port 8443
+    skip_install_trust
+    default_sni {$AUTOSEAL_HOST}
+}
+
+http://{$AUTOSEAL_HOST}:8080 {
+    redir https://{$AUTOSEAL_HOST}{uri} 308
+}
+
+https://{$AUTOSEAL_HOST}:8443 {
+    tls {
+        issuer acme https://acme-v02.api.letsencrypt.org/directory {
+            profile shortlived
+        }
+    }
+    header {
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Cache-Control no-store
+        -Server
+    }
+    reverse_proxy studio:3000
+}

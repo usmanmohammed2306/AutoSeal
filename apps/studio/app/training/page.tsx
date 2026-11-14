@@ -1,4 +1,5 @@
-import { fetchApi, type TrainingPilotsResponse } from "@/lib/api";
+import { fetchApi, type SftCalibration, type TrainingPilotsResponse } from "@/lib/api";
+import { SftCalibrationPanel } from "./sft-calibration";
 
 export const dynamic = "force-dynamic";
 
@@ -8,12 +9,16 @@ function formatReward(value: number): string {
 
 export default async function TrainingEvidence() {
   let data: TrainingPilotsResponse | null = null;
+  let calibration: SftCalibration | null = null;
+  try { calibration = await fetchApi<SftCalibration>("/api/research/sft-calibration"); }
+  catch { /* A missing or corrupt calibration is never replaced with a result. */ }
   try { data = await fetchApi<TrainingPilotsResponse>("/api/research/training-pilots"); }
   catch { /* A missing archive never becomes a fabricated training outcome. */ }
   return <div className="page">
     <div className="eyebrow">OPEN-WEIGHT MODEL / ACTUAL A100 TRAINING</div>
     <h1 className="page-title">A completed job is not<br /><em>a learned policy.</em></h1>
-    <p className="lead compact">These are paired GRPO bridge pilots. Each condition used a Qwen2.5-Coder 3B snapshot on one Sol A100, while Mac Docker supplied the training reward. The archive checks every reward request and response. It does not establish a downstream improvement.</p>
+    <p className="lead compact">Inspect the actual SFT calibration and earlier GRPO bridge pilots. Trusted model work runs on Sol A100s; candidate evaluation runs in Mac Docker. Archive verification keeps optimizer progress, task quality and reward-hacking claims separate.</p>
+    <SftCalibrationPanel data={calibration} />
     {data?.preflights?.length ? <section className="panel wide">
       <div className="repair-card-head"><span className="section-kicker">LATEST ONE-ARM PREFLIGHTS</span><span className="reject repair-status">NOT A PAIRED STUDY</span></div>
       <h2>From a failed boundary to one real gradient.</h2>

@@ -1,7 +1,8 @@
 """Local FastAPI surface for persisted AutoSeal runs.
 
 The request process records intent. A separate worker must process runs. This
-local research API has no authentication and must not be exposed publicly.
+Authentication is optional for loopback development and mandatory before any
+external exposure. Registered repair jobs execute only in the separate worker.
 """
 
 from __future__ import annotations
@@ -11,9 +12,9 @@ import json
 from pathlib import Path
 from typing import Callable, Optional
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.orm import sessionmaker
 
 from autoseal.db import EventRow, RunRow, make_session_factory
@@ -35,6 +36,18 @@ class RunCreate(BaseModel):
 
 class ModelRunImport(BaseModel):
     identity: str = Field(pattern=r"^sha256:[0-9a-f]{64}$")
+
+
+class WorkflowCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: str = Field(max_length=32)
+    payload: dict
+    idempotency_key: str = Field(pattern=r"^[a-zA-Z0-9_.:-]{1,128}$")
+
+
+def _workflow_json(row):
+    return {key: getattr(row, key) for key in ("id", "kind", "payload", "state", "attempts", "result_id", "error")} | {
+        "created_at": row.created_at.isoformat(), "updated_at": row.updated_at.isoformat()}
 
 
 def _run_json(row: RunRow) -> dict:
@@ -66,12 +79,140 @@ def create_app(
     evidence_root: Path,
     *,
     evaluator: Callable[[str], dict] = docker_compare,
+    managed_report_root: Optional[Path] = None,
+    managed_report_identity: Optional[str] = None,
+    workflow_root: Optional[Path] = None,
+    operator_token: Optional[str] = None,
+    reader_token: Optional[str] = None,
+    shell_archive_root: Optional[Path] = None,
+    shell_archive_identity: Optional[str] = None,
+    sft_archive_root: Optional[Path] = None,
+    sft_evaluation_identity: Optional[str] = None,
 ) -> FastAPI:
+    if (managed_report_root is None) != (managed_report_identity is None):
+        raise ValueError("managed report root and pinned identity must be configured together")
+    if (shell_archive_root is None) != (shell_archive_identity is None):
+        raise ValueError("native shell archive root and pinned identity must be configured together")
+    if (sft_archive_root is None) != (sft_evaluation_identity is None):
+        raise ValueError("SFT archive root and pinned evaluation must be configured together")
     sessions: sessionmaker = make_session_factory(database_url)
     store = ContentAddressedStore(evidence_root)
     service = RunService(sessions, store, evaluator=evaluator)
     app = FastAPI(title="AutoSeal Lab", version="0.1.0")
     app.state.run_service = service
+    from autoseal.access import AccessPolicy
+    from autoseal.workflows import WorkflowService, TERMINAL
+    from autoseal.artifact_cases import registered_tasks
+    workflows = WorkflowService(sessions, store, workflow_root or evidence_root.parent / (evidence_root.name + "-workflows"))
+    app.state.workflow_service = workflows
+    # Validate configuration at startup, rather than waiting for the first call.
+    AccessPolicy(app, operator_token=operator_token, reader_token=reader_token)
+    app.add_middleware(AccessPolicy, operator_token=operator_token, reader_token=reader_token)
+
+    @app.get("/api/access")
+    def access(request: Request):
+        return {"role": request.scope["autoseal.role"], "authentication": bool(operator_token)}
+
+    @app.get("/api/research/sft-calibration")
+    def sft_calibration():
+        if sft_archive_root is None:
+            raise HTTPException(503, "No pinned SFT calibration archive is configured")
+        from autoseal.sft_archive import calibration_view
+        try:
+            return calibration_view(ContentAddressedStore(sft_archive_root / "evidence"), sft_evaluation_identity)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            raise HTTPException(503, "SFT calibration archive failed verification") from exc
+
+    @app.get("/api/research/terminal-shell")
+    def native_shell_evidence():
+        if shell_archive_root is None:
+            raise HTTPException(503, "No pinned native-test shell archive is configured")
+        from autoseal.native_shell_archive import verify_shell_report
+        try:
+            return verify_shell_report(ContentAddressedStore(shell_archive_root / "evidence"), shell_archive_identity)
+        except (OSError, ValueError, KeyError) as exc:
+            raise HTTPException(503, "native-test shell archive failed verification") from exc
+
+    @app.get("/api/cases")
+    def cases():
+        return [{"id": key, "task": task.model_dump(mode="json"), "origin": "seeded"}
+                for key, task in registered_tasks().items()]
+
+    @app.post("/api/workflows", status_code=202)
+    def create_workflow(request: WorkflowCreate):
+        try:
+            return _workflow_json(workflows.submit(request.kind, request.payload, request.idempotency_key))
+        except (ValueError, OSError, KeyError, TypeError) as exc:
+            raise HTTPException(400, "invalid workflow or unavailable verified target") from exc
+
+    @app.get("/api/workflows")
+    def list_workflows(limit: int = Query(default=50, ge=1, le=100)):
+        return [_workflow_json(row) for row in workflows.list(limit)]
+
+    def require_workflow(identity):
+        try:
+            row = workflows.get(identity)
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise HTTPException(400, "invalid workflow identity") from exc
+        if row is None:
+            raise HTTPException(404, "workflow not found")
+        return row
+
+    @app.get("/api/workflows/{identity}")
+    def get_workflow(identity: str):
+        return _workflow_json(require_workflow(identity))
+
+    @app.post("/api/workflows/{identity}/{action}")
+    def mutate_workflow(identity: str, action: str):
+        require_workflow(identity)
+        if action not in {"cancel", "retry"}:
+            raise HTTPException(404, "unknown workflow action")
+        try:
+            return _workflow_json(getattr(workflows, action)(identity))
+        except ValueError as exc:
+            raise HTTPException(409, str(exc)) from exc
+
+    @app.get("/api/workflows/{identity}/events")
+    def workflow_events(identity: str, after_id: int = Query(default=0, ge=0)):
+        require_workflow(identity)
+        return [{"id": row.id, "kind": row.kind, "payload": row.payload,
+                 "created_at": row.created_at.isoformat()} for row in workflows.events(identity, after_id)]
+
+    @app.get("/api/workflows/{identity}/result")
+    def workflow_result(identity: str):
+        row = require_workflow(identity)
+        if row.result_id is None:
+            raise HTTPException(404, "workflow result unavailable")
+        try:
+            return workflows.result(identity)
+        except (OSError, ValueError, KeyError) as exc:
+            raise HTTPException(500, "stored workflow evidence failed verification") from exc
+
+    @app.get("/api/workflows/{identity}/validation")
+    def workflow_validation(identity: str):
+        row = require_workflow(identity)
+        if row.kind != "artifact_validate" or row.state != "COMPLETED":
+            raise HTTPException(409, "completed validation required")
+        try:
+            return workflows.validation(identity)
+        except (OSError, ValueError, KeyError) as exc:
+            raise HTTPException(500, "stored validation evidence failed verification") from exc
+
+    @app.get("/api/workflows/{identity}/stream")
+    async def workflow_stream(identity: str, after_id: int = Query(default=0, ge=0)):
+        require_workflow(identity)
+        async def events():
+            last_id = after_id
+            while True:
+                for row in workflows.events(identity, last_id):
+                    last_id = row.id
+                    payload = {"id": row.id, "kind": row.kind, "payload": row.payload}
+                    yield f"id: {row.id}\nevent: workflow\ndata: {json.dumps(payload)}\n\n"
+                if require_workflow(identity).state in TERMINAL:
+                    break
+                yield ": heartbeat\n\n"
+                await asyncio.sleep(0.5)
+        return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-store"})
 
     @app.get("/api/health")
     def health() -> dict:
@@ -156,6 +297,16 @@ def create_app(
             "plans": [item.model_dump(mode="json") for item in local_repair_search()],
             "scope": "local fixture preview, not a promoted V1 repair",
         }
+
+    @app.get("/api/research/managed-repair")
+    def retained_managed_repair() -> dict:
+        if managed_report_root is None:
+            raise HTTPException(status_code=503, detail="No pinned managed-validation archive is configured")
+        from autoseal.managed_review import managed_review
+        try:
+            return managed_review(managed_report_root, managed_report_identity)
+        except (OSError, RuntimeError, ValueError, KeyError, TypeError) as exc:
+            raise HTTPException(status_code=503, detail="Managed-validation archive failed integrity checks") from exc
 
     @app.get("/api/research/promotion-review")
     def promotion_review() -> dict:

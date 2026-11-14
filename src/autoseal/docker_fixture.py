@@ -8,11 +8,13 @@ is Mac Docker Desktop for scoped research, with no public untrusted-code API.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
 from pathlib import Path
 import shutil
 import subprocess
 import tempfile
 import uuid
+from typing import Optional
 
 from autoseal.execution import CommandResult, CommandStatus, run_command
 from autoseal.local_demo import ArtifactProjection, FIXTURE, _counts, candidate_identity
@@ -32,9 +34,11 @@ class DockerFixtureResult:
     verdict: str
     counts: dict[str, int]
     process: CommandResult
+    container_inspection: Optional[dict] = None
+    daemon_receipts: Optional[dict] = None
 
     def to_dict(self) -> dict:
-        return {
+        result = {
             "candidate": self.candidate,
             "channel": self.channel,
             "candidate_identity": self.candidate_identity,
@@ -44,6 +48,11 @@ class DockerFixtureResult:
             "counts": self.counts,
             "process": self.process.to_dict(),
         }
+        if self.container_inspection is not None:
+            result["container_inspection"] = self.container_inspection
+        if self.daemon_receipts is not None:
+            result["daemon_receipts"] = self.daemon_receipts
+        return result
 
 
 def image_identity(image: str) -> str:
@@ -104,6 +113,7 @@ def run_workspace_in_docker(
     channel: str,
     image: str = DEFAULT_IMAGE,
     timeout_seconds: float = 15,
+    capture_enforcement: bool = False,
 ) -> DockerFixtureResult:
     """Run an existing local workspace as a read-only verifier input."""
 
@@ -123,15 +133,39 @@ def run_workspace_in_docker(
         "--mount", f"type=bind,src={workspace},dst=/workspace,readonly",
         "--workdir", "/workspace", image_digest,
     ]
+    inspection = None
+    daemon_receipts = None
     try:
+        if capture_enforcement:
+            # Inspect a stopped container through the daemon before any
+            # candidate executes. Keep the default replay command unchanged.
+            create = ["docker", "create", *command[3:]]
+            created = run_command(create, timeout_seconds=15, max_output_bytes=4096)
+            if created.status is not CommandStatus.EXITED_ZERO:
+                raise RuntimeError("could not create baseline container")
+            inspected = run_command(["docker", "inspect", container_name],
+                                    timeout_seconds=10, max_output_bytes=64 * 1024)
+            if inspected.status is not CommandStatus.EXITED_ZERO or inspected.stdout_truncated:
+                raise RuntimeError("could not inspect baseline container")
+            body = json.loads(inspected.stdout)
+            if not isinstance(body, list) or len(body) != 1:
+                raise RuntimeError("invalid baseline inspection")
+            inspection = body[0]
+            daemon_receipts = {"creation": created.to_dict(), "inspection": inspected.to_dict()}
+            command = ["docker", "start", "--attach", container_name]
         process = run_command(
             command, timeout_seconds=timeout_seconds, max_output_bytes=32 * 1024
         )
     finally:
-        subprocess.run(
+        removed = run_command(
             ["docker", "rm", "-f", container_name],
-            capture_output=True, check=False, timeout=10,
+            timeout_seconds=10, max_output_bytes=4096,
         )
+        if capture_enforcement:
+            if removed.status is not CommandStatus.EXITED_ZERO:
+                raise RuntimeError("baseline container cleanup failed")
+            if daemon_receipts is not None:
+                daemon_receipts["cleanup"] = removed.to_dict()
     counts = _counts(process.stdout)
     if process.status is CommandStatus.EXITED_ZERO:
         if channel in {"audit", "sealed"} and (counts["passed"] != 7 or counts["skipped"]):
@@ -153,4 +187,6 @@ def run_workspace_in_docker(
         verdict=verdict,
         counts=counts,
         process=process,
+        container_inspection=inspection,
+        daemon_receipts=daemon_receipts,
     )

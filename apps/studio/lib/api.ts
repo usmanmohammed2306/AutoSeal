@@ -187,6 +187,22 @@ export type RepairPlanPreviewResponse = {
   seal_evidence: null;
 };
 
+export type ManagedRepairResponse = {
+  report_id: string;
+  source: "verified_saved_execution";
+  scope: string;
+  disposition: "UNENFORCEABLE";
+  seal_evidence: null;
+  gates: Record<string, boolean>;
+  enforcement_probe: { identity: string; passed: boolean; gates: Record<string, boolean>; limitations: string[] } | null;
+  controls: { name: string; role: string; candidate_identity: string; proxy: string; audit: string; sealed: string[] }[];
+  stress: { name: string; verdict: string; counts: { passed: number; failed: number } };
+  rollback_id: string;
+  run_metadata: { started_at_utc: string; finished_at_utc: string; elapsed_seconds: number; evaluations: number; gpu_jobs: number; capability_probe_executions?: number };
+  verification: string;
+  limitations: string[];
+};
+
 export type UpstreamGraderCase = {
   case: string;
   expected_tests: string[];
@@ -243,8 +259,37 @@ export type SWEbenchRepairPreview = {
 
 export const API_URL = process.env.AUTOSEAL_API_URL ?? "http://127.0.0.1:8000";
 
+export type SftCalibration = {
+  archive_id: string; evaluation_id: string; configuration_id: string; adapter_id: string;
+  report_id: string; dataset_revision: string; seed: number; resumed_from_step: number; global_step: number;
+  attempted_per_phase: number; scope: string; loss_scope: string; max_steps: number;
+  training_examples: number; trainable_parameters: number; peak_gpu_bytes: number; gpu: string;
+  model_source: { repository: string; revision: string }; scheduler: string;
+  phases: Record<"baseline" | "post_sft", { attempted: number; syntax_valid: number; audit_pass: number;
+    proxy_pass: number; fixed_wrong_adherent: number; classifications: Record<string, number> }>;
+  curve: { step: number; loss: number; grad_norm: number; learning_rate: number }[];
+  limitations: string[];
+};
+
 export async function fetchApi<T>(path: string): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, { cache: "no-store" });
+  const token = process.env.AUTOSEAL_API_TOKEN;
+  const response = await fetch(`${API_URL}${path}`, { cache: "no-store",
+    headers: token ? { Authorization: `Bearer ${token}` } : {} });
   if (!response.ok) throw new Error(`AutoSeal API returned ${response.status}`);
   return response.json() as Promise<T>;
 }
+
+export type Workflow = {
+  id: string; kind: string; payload: Record<string, string>;
+  state: "QUEUED" | "RUNNING" | "CANCEL_REQUESTED" | "COMPLETED" | "FAILED" | "CANCELLED";
+  attempts: number; result_id: string | null; error: string | null; created_at: string; updated_at: string;
+};
+
+export type ArtifactValidation = {
+  validation_id: string; task: { task_id: string; operation: string; proxy_mode: string; origin: string };
+  gates: Record<string, boolean>;
+  controls: { name: string; role: string; proxy: string; audit: string; sealed: string[] }[];
+  search: { candidates?: unknown[]; [key: string]: unknown };
+  graph: Record<string, unknown>; parent_revision: string; child_revision: string;
+  witness_id: string; rollback_id: string; limitations: string[];
+};
