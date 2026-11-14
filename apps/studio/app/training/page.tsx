@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { fetchApi, type ModelStudy, type SftCalibration, type TrainingPilotsResponse } from "@/lib/api";
 import { SftCalibrationPanel } from "./sft-calibration";
 import { ModelStudyPanel } from "./model-study";
@@ -8,22 +9,11 @@ function formatReward(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(3);
 }
 
-export default async function TrainingEvidence() {
+async function LegacyTrainingEvidence() {
   let data: TrainingPilotsResponse | null = null;
-  let calibration: SftCalibration | null = null;
-  let study: ModelStudy | null = null;
-  try { study = await fetchApi<ModelStudy>("/api/research/model-study"); }
-  catch { /* Only verified retained studies supply comparison results. */ }
-  try { calibration = await fetchApi<SftCalibration>("/api/research/sft-calibration"); }
-  catch { /* A missing or corrupt calibration is never replaced with a result. */ }
   try { data = await fetchApi<TrainingPilotsResponse>("/api/research/training-pilots"); }
-  catch { /* A missing archive never becomes a fabricated training outcome. */ }
-  return <div className="page">
-    <div className="eyebrow">OPEN-WEIGHT MODEL / ACTUAL A100 TRAINING</div>
-    <h1 className="page-title">A completed job is not<br /><em>a learned policy.</em></h1>
-    <p className="lead compact">Inspect paired model audits, SFT calibration and earlier GRPO bridge pilots. Trusted model work runs on Sol A100s; candidate evaluation runs in Mac Docker. Archive verification keeps optimizer progress, task quality and reward-hacking claims separate.</p>
-    <ModelStudyPanel data={study} />
-    <SftCalibrationPanel data={calibration} />
+  catch { /* Missing historical evidence stays unavailable. */ }
+  return <>
     {data?.preflights?.length ? <section className="panel wide">
       <div className="repair-card-head"><span className="section-kicker">LATEST ONE-ARM PREFLIGHTS</span><span className="reject repair-status">NOT A PAIRED STUDY</span></div>
       <h2>From a failed boundary to one real gradient.</h2>
@@ -55,6 +45,36 @@ export default async function TrainingEvidence() {
         <details><summary>Inspect exact lineage</summary><p className="mono">Configuration: {pilot.configuration_id}<br />Model snapshot: {pilot.summary.model_snapshot_revision}<br />Archived content objects: {pilot.objects}</p></details>
       </section>;
     })}
+  </>;
+}
+
+async function VerifiedStudy() {
+  let data: ModelStudy | null = null;
+  try { data = await fetchApi<ModelStudy>("/api/research/model-study"); }
+  catch { /* A failed check never becomes a demonstration result. */ }
+  return <ModelStudyPanel data={data} />;
+}
+
+async function VerifiedCalibration() {
+  let data: SftCalibration | null = null;
+  try { data = await fetchApi<SftCalibration>("/api/research/sft-calibration"); }
+  catch { /* Keep unavailable calibration evidence explicit. */ }
+  return <SftCalibrationPanel data={data} />;
+}
+
+function CheckingEvidence({ title }: { title: string }) {
+  return <section className="panel wide" role="status"><span className="section-kicker">VERIFYING SAVED EVIDENCE</span>
+    <h2>{title}</h2><p className="panel-copy">Reading the retained receipts and their lineage. This page starts no model, training or candidate execution.</p></section>;
+}
+
+export default function TrainingEvidence() {
+  return <div className="page">
+    <div className="eyebrow">OPEN-WEIGHT MODEL / ACTUAL A100 TRAINING</div>
+    <h1 className="page-title">Follow the model<br /><em>through the audit.</em></h1>
+    <p className="lead compact">Inspect paired model audits, SFT calibration and earlier GRPO bridge pilots. Trusted model work runs on Sol A100s; candidate evaluation runs in Mac Docker. Each panel checks its saved evidence independently.</p>
+    <Suspense fallback={<CheckingEvidence title="Checking the saved model comparison." />}><VerifiedStudy /></Suspense>
+    <Suspense fallback={<CheckingEvidence title="Checking the SFT checkpoint." />}><VerifiedCalibration /></Suspense>
+    <Suspense fallback={<CheckingEvidence title="Loading earlier experiments." />}><LegacyTrainingEvidence /></Suspense>
     <div className="notice">Full V1 still requires its complete external-case, preservation, enforcement, baseline, ablation and operated-delivery evidence. A model comparison on authored finite tasks has a narrower scope. Null and adverse findings remain visible.</div>
   </div>;
 }

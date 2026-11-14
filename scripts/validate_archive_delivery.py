@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import secrets
 import socket
 import ssl
@@ -28,9 +29,16 @@ def main():
     parser.add_argument('--https', action='store_true', help='Also verify local TLS using an isolated private CA.')
     parser.add_argument('--recovery', action='store_true', help='Back up an actual Docker fixture receipt and restore PostgreSQL/CAS into a separate local stack.')
     parser.add_argument('--rollback-image', help='With --recovery, check a distinct reviewed local API image by immutable sha256 identity.')
+    parser.add_argument('--image-inventory', type=Path, help='With --https, check a local immutable Linux/amd64 image inventory instead of the default images.')
+    parser.add_argument('--model-payload', type=Path, help='Mount an explicitly prepared private model-evidence payload read-only.')
+    parser.add_argument('--payload-id', help='Reviewed SHA-256 identity of that payload manifest.')
     args = parser.parse_args()
     if args.rollback_image and not args.recovery:
         parser.error('--rollback-image requires --recovery')
+    if args.image_inventory and not args.https:
+        parser.error('--image-inventory requires --https')
+    if bool(args.model_payload) != bool(args.payload_id):
+        parser.error('--model-payload and --payload-id must be supplied together')
     args.root.mkdir(parents=True, exist_ok=False)
     project = 'autoseal_archive_' + uuid.uuid4().hex[:12]
     with socket.socket() as sock:
@@ -68,7 +76,7 @@ def main():
 q=json.load(sys.stdin);headers={'Authorization':'Bearer '+q['token']} if q['token'] else {}
 r=urllib.request.Request('http://127.0.0.1:8000'+q['path'],method=q['method'],headers=headers)
 try:
- with urllib.request.urlopen(r,timeout=5) as p:
+ with urllib.request.urlopen(r,timeout=45 if q['path'] in {'/api/research/model-study','/api/research/sft-calibration'} else 5) as p:
   raw=p.read(2*1024*1024+1); assert len(raw)<=2*1024*1024
   print(json.dumps({'status':p.status,'body':raw.decode()}))
 except urllib.error.HTTPError as p:print(json.dumps({'status':p.code,'body':p.read(4096).decode()}))
@@ -82,6 +90,44 @@ except urllib.error.HTTPError as p:print(json.dumps({'status':p.code,'body':p.re
         if args.https:
             for path in map(Path, ['deploy/caddy.Dockerfile', 'deploy/Caddyfile.local', 'deploy/compose.tls-local.yaml']):
                 report['source_files'][str(path)] = 'sha256:' + hashlib.sha256(path.read_bytes()).hexdigest()
+        if args.image_inventory:
+            inventory = json.loads(args.image_inventory.read_bytes())
+            if set(inventory) != {'platform', 'api', 'studio', 'proxy'} or inventory['platform'] != 'linux/amd64':
+                raise ValueError('expected a Linux/amd64 API, Studio and proxy inventory')
+            for name in ('api', 'studio', 'proxy'):
+                if not re.fullmatch(r'sha256:[0-9a-f]{64}', inventory[name]):
+                    raise ValueError('image inventory requires immutable local identities')
+                inspected = json.loads(command(['docker', 'image', 'inspect', inventory[name]]).stdout)[0]
+                if (inspected['Os'], inspected['Architecture']) != ('linux', 'amd64'):
+                    raise ValueError('local image does not match the declared Linux/amd64 platform')
+            overrides = {name: {'image': inventory['api' if name == 'migrate' else name], 'platform': inventory['platform']}
+                for name in ('api', 'migrate', 'studio', 'proxy')}
+            overrides['db'] = {'platform': inventory['platform']}
+            override = args.root.resolve() / 'local-image-inventory.json'
+            override.write_text(json.dumps({'services': overrides}))
+            compose += ['-f', str(override)]
+            report['image_inventory'] = inventory
+            report['limitations'].append('Linux/amd64 runs under local Mac Docker emulation; this is not native cloud performance.')
+        if args.model_payload:
+            raw = (args.model_payload / 'manifest.json').read_bytes()
+            if 'sha256:' + hashlib.sha256(raw).hexdigest() != args.payload_id:
+                raise ValueError('model payload differs from the reviewed manifest identity')
+            payload = json.loads(raw)
+            if (payload['kind'] != 'autoseal_private_archive_payload' or payload['schema_version'] != 1
+                    or set(payload['packs']) != {'study', 'sft'}):
+                raise ValueError('unsupported private model-evidence payload')
+            for name in ('study', 'sft'):
+                if not re.fullmatch(r'sha256:[0-9a-f]{64}', payload['packs'][name]['root_identity']):
+                    raise ValueError('model evidence requires pinned evaluation identities')
+            override = args.root.resolve() / 'local-model-payload.json'
+            override.write_text(json.dumps({'services': {'api': {
+                'volumes': [{'type': 'bind', 'source': str(args.model_payload.resolve()), 'target': '/srv/model-evidence', 'read_only': True}],
+                'environment': {'AUTOSEAL_STUDY_ROOT': '/srv/model-evidence/study',
+                    'AUTOSEAL_STUDY_ID': payload['packs']['study']['root_identity'],
+                    'AUTOSEAL_SFT_ROOT': '/srv/model-evidence/sft',
+                    'AUTOSEAL_SFT_ID': payload['packs']['sft']['root_identity']}}}}))
+            compose += ['-f', str(override)]
+            report['model_payload_id'] = args.payload_id
         command(compose + ['up', '-d', '--no-build'], timeout=120)
         deadline = time.monotonic() + 60
         while True:
@@ -171,6 +217,41 @@ except urllib.error.HTTPError as p:print(json.dumps({'status':p.code,'body':p.re
             passed('tls_proxy_is_nonroot_without_capabilities', proxy['Config']['User'] == '10001:10001'
                 and proxy['HostConfig']['CapDrop'] == ['ALL'] and proxy['HostConfig']['ReadonlyRootfs'])
             report['limitations'].append('Local TLS uses only an isolated test CA trusted by this client, not the host trust store or a public CA.')
+        if args.model_payload:
+            for kind, path, identity_key in [('study', '/api/research/model-study', 'evaluation_id'),
+                    ('sft', '/api/research/sft-calibration', 'evaluation_id')]:
+                started_view = time.monotonic()
+                response = api(path, token=env['AUTOSEAL_READER_TOKEN'])
+                value = json.loads(response['body'])
+                passed(f'private_{kind}_payload_reverified_inside_container', response['status'] == 200
+                    and value[identity_key] == payload['packs'][kind]['root_identity'])
+                report.setdefault('saved_view_seconds', {})[kind] = time.monotonic() - started_view
+            # Read the actual Studio stream. The checking state must arrive
+            # before the completed receipt table; no fake progress is inferred.
+            started_view = time.monotonic()
+            chunks, received, shell_seconds = [], 0, None
+            with httpx.Client(timeout=60) as viewer:
+                with viewer.stream('GET', f'http://127.0.0.1:{port}/training', headers=headers) as response:
+                    if response.status_code != 200:
+                        raise RuntimeError(f'training page returned HTTP {response.status_code}')
+                    for chunk in response.iter_bytes():
+                        received += len(chunk)
+                        if received > 4 * 1024 * 1024:
+                            raise RuntimeError('training page exceeded its review byte budget')
+                        chunks.append(chunk)
+                        if shell_seconds is None and b'Checking the saved model comparison.' in b''.join(chunks):
+                            shell_seconds = time.monotonic() - started_view
+            page = b''.join(chunks).decode()
+            complete_seconds = time.monotonic() - started_view
+            passed('studio_streams_checking_state_before_verified_model_table', shell_seconds is not None
+                and shell_seconds < complete_seconds
+                and page.index('Checking the saved model comparison.') < page.index('Compare what the models actually submitted.'))
+            passed('model_page_omits_application_credentials', not any(env[key] in page for key in (
+                'AUTOSEAL_DB_PASSWORD', 'AUTOSEAL_READER_TOKEN', 'AUTOSEAL_OPERATOR_TOKEN', 'AUTOSEAL_STUDIO_PASSWORD')))
+            report['saved_view_seconds'].update(training_checking_state_bytes=shell_seconds, training_complete_stream=complete_seconds)
+            report['limitations'] = [item for item in report['limitations'] if not item.startswith('Empty-state/')]
+            report['limitations'].append('The PostgreSQL run list begins empty; the separate private model-evidence mount is reverified independently. No live execution bridge is enabled.')
+            report['limitations'].append('Private reviewed model evidence is mounted read-only; no model inference, optimizer deserialization or candidate execution takes place in this application profile.')
         if args.recovery:
             from archive_recovery import validate_recovery
             for path in map(Path, ['scripts/archive_recovery.py', 'scripts/archive_snapshot.py']):

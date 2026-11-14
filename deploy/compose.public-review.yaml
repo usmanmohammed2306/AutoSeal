@@ -1,0 +1,50 @@
+# Reviewable public archive profile. Run only after separate deployment approval.
+# No AWS resource, certificate or public listener is created by saving this file.
+# Supply locally built immutable image identities, never mutable registry tags.
+services:
+  migrate:
+    image: ${AUTOSEAL_API_IMAGE:?Set the reviewed immutable API image}
+    platform: linux/amd64
+    logging: &bounded_logs
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  api:
+    image: ${AUTOSEAL_API_IMAGE:?Set the reviewed immutable API image}
+    platform: linux/amd64
+    logging: *bounded_logs
+  studio:
+    image: ${AUTOSEAL_STUDIO_IMAGE:?Set the reviewed immutable Studio image}
+    platform: linux/amd64
+    logging: *bounded_logs
+  db:
+    platform: linux/amd64
+    logging: *bounded_logs
+  proxy:
+    image: ${AUTOSEAL_PROXY_IMAGE:?Set the reviewed immutable proxy image}
+    platform: linux/amd64
+    profiles: [public-review]
+    environment:
+      AUTOSEAL_HOST: ${AUTOSEAL_HOST:?Set the reviewed public IP after provisioning approval}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - archive_tls_data:/data
+      - archive_tls_config:/config
+    ports:
+      - "0.0.0.0:80:8080"
+      - "0.0.0.0:443:8443"
+    depends_on:
+      studio:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp:rw,nosuid,nodev,size=16m"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.25
+    pids_limit: 64
+    logging: *bounded_logs
+volumes:
+  archive_tls_data:
+  archive_tls_config:

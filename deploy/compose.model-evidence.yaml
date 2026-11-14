@@ -1,0 +1,13 @@
+# Optional protected saved-model evidence. No model or optimizer is executed.
+services:
+  api:
+    environment:
+      AUTOSEAL_STUDY_ROOT: /srv/model-evidence/study
+      AUTOSEAL_STUDY_ID: ${AUTOSEAL_STUDY_ID:?Set the reviewed hidden evaluation identity}
+      AUTOSEAL_SFT_ROOT: /srv/model-evidence/sft
+      AUTOSEAL_SFT_ID: ${AUTOSEAL_SFT_ID:?Set the reviewed SFT evaluation identity}
+    volumes:
+      - type: bind
+        source: ${AUTOSEAL_MODEL_EVIDENCE_DIR:?Set the absolute reviewed payload directory}
+        target: /srv/model-evidence
+        read_only: true

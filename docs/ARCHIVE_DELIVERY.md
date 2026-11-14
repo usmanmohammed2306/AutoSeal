@@ -63,3 +63,21 @@ The snapshot manifest binds each file's name, length and digest, including the d
 PostgreSQL readiness uses TCP to avoid the temporary socket-only initialization server. Earlier validation attempts retained both a missing-reader-credential error in the test harness and this initialization race before correction. The final local rehearsal passed 28 checks, including TLS, independent-volume restoration, a corrupt-copy refusal, previous/current API image switching and cleanup of both stacks.
 
 This checks one quiescent local fixture archive and two compatible application images. It does not establish AWS recovery, active-writer snapshot consistency, arbitrary schema rollback, production RPO/RTO, a reviewed model-evidence upload or a live execution bridge. Scheduled off-host retention and an operated restore still belong to the deployment acceptance.
+
+## Prepare protected model evidence
+
+`scripts/prepare_archive_payload.py` checks the original SFT and hidden-audit evaluations, copies only their reachable content objects into a new private directory, then verifies the exported graphs again. It never copies a whole research directory or uploads anything. Use `--help` for the required archive paths and evaluation identities. Missing source evidence, changed bytes, oversized graphs and credential-shaped byte patterns cause refusal. The byte-pattern check is limited and still requires an actual private evidence review.
+
+The reference payload contains 7,634 content objects and 333,552,678 bytes. It includes inert adapter/optimizer evidence needed to verify training lineage. The 7B base weights are represented by their provenance inventory, not copied. Original machine paths can remain in protected receipts. Keep this payload outside Git and mount it read-only; no model-weight download endpoint is added.
+
+For an authorized local test, `validate_archive_delivery.py` accepts `--model-payload` together with `--payload-id`, the manifest's original SHA-256 identity. The API independently verifies both model views inside the container. The validator also reads the actual Studio response stream and checks that its checking state arrives before the completed model table, with application credentials absent from the response.
+
+The training page streams its panels independently. In one local x86-emulated, CPU-limited test, checking-state bytes arrived after 0.041 seconds and the completed stream after 26.60 seconds. Full receipt checking still took about 26 seconds. This is a single HTTP stream observation, not browser first paint, a percentile, a speedup in verification or cloud latency. Missing and failed archives keep their explicit unavailable states.
+
+## Review a future public deployment
+
+`deploy/compose.public-review.yaml` is a configuration to review before deployment approval. It pins the target platform to Linux/amd64, requires reviewed immutable application image identities, bounds container logs and exposes only the TLS proxy publicly on 80/443. API and PostgreSQL remain private, Studio stays authenticated and reader-only, and no worker is added. Its explicit `public-review` profile must be selected before the proxy can start.
+
+`deploy/compose.model-evidence.yaml` optionally mounts the reviewed payload at `/srv/model-evidence` with read-only access and requires the two original evaluation identities. These files neither provision AWS nor upgrade a plan. Public execution still requires the approved configuration, actual HTTPS, private credentials and separate deployment/cost authorization.
+
+For local target-image compatibility, build the trusted images with `docker build --platform linux/amd64 ...`. Record their `docker image inspect` identities in a JSON inventory with exactly `platform`, `api`, `studio` and `proxy` keys. Supply it to `validate_archive_delivery.py --https --image-inventory ...`. The validator refuses another declared platform, mutable image references or locally absent/wrong-architecture images. Linux/amd64 recovery passed 28 checks under Mac emulation. A separate protected-payload and streaming check passed 22. Neither is a deployed AWS service or native cloud performance result.
